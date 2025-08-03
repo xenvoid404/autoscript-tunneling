@@ -38,32 +38,32 @@
 - **SSH WebSocket Tunnel** - Port 8880
 
 ### Xray-core Protocols
-- **VMess TCP** - Port 80
+- **VMess TCP** - Port 8080
 - **VMess WebSocket+TLS** - Port 443
-- **VLESS TCP** - Port 80
+- **VLESS TCP** - Port 8081
 - **VLESS WebSocket+TLS** - Port 443
-- **Trojan TCP+TLS** - Port 443
-- **Trojan WebSocket+TLS** - Port 443
+- **Trojan TCP+TLS** - Port 8443
 
 ## ⚡ Quick Installation
 
 ### Method 1: One-Command Install (Recommended)
 
 ```bash
-# Install dengan wget (recommended)
-wget -O - https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/quick-install.sh | sudo bash
+# Install dengan curl (recommended)
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash
 
-# Alternative dengan curl
-curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/quick-install.sh | sudo bash
+# Alternative: Download, run, then cleanup
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh -o install.sh && chmod +x install.sh && ./install.sh && rm install.sh
 ```
 
 ### Method 2: Manual Installation
 
 ```bash
 # Download installer
-wget https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh -o install.sh
 chmod +x install.sh
 sudo ./install.sh
+rm install.sh  # cleanup after installation
 ```
 
 ### Method 3: Git Clone Method
@@ -79,7 +79,6 @@ sudo ./install.sh
 ```
 autoscript/
 ├── install.sh              # Main installer script
-├── quick-install.sh         # Quick installer
 ├── config/                  # Configuration files
 │   ├── system.conf          # System configuration
 │   ├── ssh.conf            # SSH configuration template
@@ -309,97 +308,29 @@ Jika script ini berguna, please give a star ⭐ pada repository ini!
 **Last Updated**: 2024  
 **Tested On**: Debian 11+, Ubuntu 22.04+
 
-# Installation Options
+## 📋 Installation Options
 
-## Interactive Installation (Default)
-```bash
-# Download and run with user prompts
-wget -O install.sh https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh
-chmod +x install.sh
-./install.sh
-```
-
-## Non-Interactive Installation (Recommended for Automation)
-
-### Quick Install (Fully Automated)
-```bash
-# One-command installation - completely automated
-curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
-
-# Or with wget
-wget -O - https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
-```
-
-### Manual Installation with Options
-```bash
-# Download first, then run with options
-wget -O install.sh https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh
-chmod +x install.sh
-
-# Non-interactive mode (no user prompts)
-./install.sh --non-interactive
-
-# Auto-answer yes to all prompts
-./install.sh --yes
-
-# Force reinstallation even if already installed
-./install.sh --force --yes
-
-# Show help
-./install.sh --help
-```
-
-### Advanced Usage
-```bash
-# Via curl with options
-curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh | bash -s -- --non-interactive
-
-# Force reinstall via pipe
-curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh | bash -s -- --force --yes
-
-# Quick install with custom options
-curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash -s -- --force
-```
-
-## Installation Options Reference
+The installer supports several command-line options for different scenarios:
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--non-interactive` | - | Run in completely non-interactive mode (no user input required) |
 | `--yes` | `-y` | Automatically answer "yes" to all prompts |
 | `--force` | `-f` | Force reinstallation even if already installed |
+| `--non-interactive` | - | Run in completely non-interactive mode |
 | `--help` | `-h` | Show help information |
 
-## Timeout Handling
+### Usage Examples
 
-The installation script now includes automatic timeout handling:
-- User prompts timeout after 30 seconds with default answers
-- Non-interactive mode is automatically detected when running via pipe
-- No more hanging installations waiting for user input
+```bash
+# Interactive installation (default)
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash
 
-## Troubleshooting Installation Issues
+# Auto-confirm all prompts
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash -s -- --yes
 
-### Script Hangs or Gets Stuck
-If you experience hanging during installation:
+# Force reinstall with auto-confirm
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash -s -- --force --yes
 
-1. **Use non-interactive mode:**
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
-   ```
-
-2. **Use timeout-safe installation:**
-   ```bash
-   ./install.sh --yes
-   ```
-
-3. **For automation/CI:**
-   ```bash
-   ./install.sh --non-interactive --force
-   ```
-
-### Common Scenarios
-
-- **Docker/Container environments:** Use `--non-interactive`
-- **CI/CD pipelines:** Use `--non-interactive --force`
-- **Remote servers:** Use the quick-install method
-- **Reinstallation:** Use `--force --yes`
+# Non-interactive mode (for automation)
+curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash -s -- --non-interactive
+```
