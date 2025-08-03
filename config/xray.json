@@ -1,0 +1,251 @@
+{
+    "log": {
+        "access": "/var/log/xray/access.log",
+        "error": "/var/log/xray/error.log",
+        "loglevel": "warning"
+    },
+    "inbounds": [
+        {
+            "tag": "vmess-tcp",
+            "port": 80,
+            "protocol": "vmess",
+            "settings": {
+                "clients": []
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "tcpSettings": {
+                    "header": {
+                        "type": "http",
+                        "request": {
+                            "version": "1.1",
+                            "method": "GET",
+                            "path": ["/"],
+                            "headers": {
+                                "Host": ["www.cloudflare.com"],
+                                "User-Agent": [
+                                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36",
+                                    "Mozilla/5.0 (iPhone; CPU iPhone OS 10_0_2 like Mac OS X) AppleWebKit/601.1 (KHTML, like Gecko) CriOS/53.0.2785.109 Mobile/14A456 Safari/601.1.46"
+                                ],
+                                "Accept": [
+                                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+                                ],
+                                "Accept-Language": ["en-US,en;q=0.8"],
+                                "Accept-Encoding": ["gzip, deflate"],
+                                "Cache-Control": ["no-cache"],
+                                "Pragma": "no-cache"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "tag": "vmess-ws",
+            "port": 443,
+            "protocol": "vmess",
+            "settings": {
+                "clients": []
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/xray/xray.crt",
+                            "keyFile": "/etc/xray/xray.key"
+                        }
+                    ]
+                },
+                "wsSettings": {
+                    "path": "/vmess",
+                    "headers": {
+                        "Host": ""
+                    }
+                }
+            }
+        },
+        {
+            "tag": "vless-tcp",
+            "port": 80,
+            "protocol": "vless",
+            "settings": {
+                "clients": [],
+                "decryption": "none",
+                "fallbacks": [
+                    {
+                        "dest": 8080
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "tcpSettings": {
+                    "header": {
+                        "type": "http",
+                        "request": {
+                            "version": "1.1",
+                            "method": "GET",
+                            "path": ["/"],
+                            "headers": {
+                                "Host": ["www.cloudflare.com"],
+                                "User-Agent": [
+                                    "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36"
+                                ],
+                                "Accept": [
+                                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+                                ],
+                                "Accept-Language": ["en-US,en;q=0.8"],
+                                "Accept-Encoding": ["gzip, deflate"]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "tag": "vless-ws",
+            "port": 443,
+            "protocol": "vless",
+            "settings": {
+                "clients": [],
+                "decryption": "none"
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/xray/xray.crt",
+                            "keyFile": "/etc/xray/xray.key"
+                        }
+                    ]
+                },
+                "wsSettings": {
+                    "path": "/vless",
+                    "headers": {
+                        "Host": ""
+                    }
+                }
+            }
+        },
+        {
+            "tag": "trojan-tcp",
+            "port": 443,
+            "protocol": "trojan",
+            "settings": {
+                "clients": []
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/xray/xray.crt",
+                            "keyFile": "/etc/xray/xray.key"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "tag": "trojan-ws",
+            "port": 443,
+            "protocol": "trojan",
+            "settings": {
+                "clients": []
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/xray/xray.crt",
+                            "keyFile": "/etc/xray/xray.key"
+                        }
+                    ]
+                },
+                "wsSettings": {
+                    "path": "/trojan",
+                    "headers": {
+                        "Host": ""
+                    }
+                }
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "blocked",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ],
+    "routing": {
+        "domainStrategy": "IPIfNonMatch",
+        "rules": [
+            {
+                "type": "field",
+                "ip": [
+                    "0.0.0.0/8",
+                    "10.0.0.0/8",
+                    "100.64.0.0/10",
+                    "127.0.0.0/8",
+                    "169.254.0.0/16",
+                    "172.16.0.0/12",
+                    "192.0.0.0/24",
+                    "192.0.2.0/24",
+                    "192.168.0.0/16",
+                    "198.18.0.0/15",
+                    "198.51.100.0/24",
+                    "203.0.113.0/24",
+                    "::1/128",
+                    "fc00::/7",
+                    "fe80::/10"
+                ],
+                "outboundTag": "blocked"
+            },
+            {
+                "type": "field",
+                "protocol": ["bittorrent"],
+                "outboundTag": "blocked"
+            },
+            {
+                "type": "field",
+                "outboundTag": "direct"
+            }
+        ]
+    },
+    "stats": {},
+    "api": {
+        "tag": "api",
+        "services": ["StatsService"]
+    },
+    "policy": {
+        "levels": {
+            "0": {
+                "statsUserUplink": true,
+                "statsUserDownlink": true
+            }
+        },
+        "system": {
+            "statsInboundUplink": true,
+            "statsInboundDownlink": true,
+            "statsOutboundUplink": true,
+            "statsOutboundDownlink": true
+        }
+    }
+}
