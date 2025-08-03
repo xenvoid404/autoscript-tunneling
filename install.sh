@@ -8,7 +8,7 @@
 # License: MIT
 #
 # Quick Install:
-# wget -O install.sh https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh && chmod +x install.sh && ./install.sh
+# curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash
 
 # Exit on any error
 set -e
@@ -51,38 +51,17 @@ print_banner() {
     echo "║  • System optimization                                   ║"
     echo "║                                                          ║"
     echo "║  Compatible: Debian 11+ | Ubuntu 22.04+                ║"
-    echo "║  Installation: One-command via wget                     ║"
+    echo "║  Installation: One-command via curl                     ║"
     echo "╚══════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-}
-
-print_step() {
-    echo -e "\n${BLUE}[STEP]${NC} ${WHITE}$1${NC}"
-    echo -e "${BLUE}$(printf '%.0s=' {1..60})${NC}"
-}
-
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 # System compatibility check
 check_system_compatibility() {
     # Check if running as root
     if [[ $EUID -ne 0 ]]; then
-        print_error "This script must be run as root"
-        print_info "Please run: sudo $0"
+        echo -e "${RED}Error: This script must be run as root${NC}"
+        echo "Please run: sudo $0"
         exit 1
     fi
     
@@ -92,7 +71,7 @@ check_system_compatibility() {
         OS=$NAME
         VER=$VERSION_ID
     else
-        print_error "Cannot detect OS information"
+        echo -e "${RED}Error: Cannot detect OS information${NC}"
         exit 1
     fi
     
@@ -147,29 +126,29 @@ check_system_compatibility() {
     case $OS in
         "Ubuntu")
             if ! version_compare "$VER" ">=" "22.04"; then
-                print_error "Ubuntu 22.04+ required. Current: $VER"
+                echo -e "${RED}Error: Ubuntu 22.04+ required. Current: $VER${NC}"
                 exit 1
             fi
             ;;
         "Debian GNU/Linux")
             if ! version_compare "$VER" ">=" "11"; then
-                print_error "Debian 11+ required. Current: $VER"
+                echo -e "${RED}Error: Debian 11+ required. Current: $VER${NC}"
                 exit 1
             fi
             ;;
         *)
-            print_error "Unsupported OS: $OS"
-            print_info "Supported: Debian 11+ or Ubuntu 22.04+"
+            echo -e "${RED}Error: Unsupported OS: $OS${NC}"
+            echo "Supported: Debian 11+ or Ubuntu 22.04+"
             exit 1
             ;;
     esac
     
-    print_success "OS compatibility check passed: $OS $VER"
+    echo -e "${GREEN}✓ OS compatibility check passed: $OS $VER${NC}"
 }
 
 # Check internet connectivity
 check_internet() {
-    print_info "Checking internet connectivity..."
+    echo "Checking internet connectivity..."
     
     # Test connectivity to multiple servers
     local test_hosts=("8.8.8.8" "1.1.1.1" "github.com")
@@ -183,46 +162,35 @@ check_internet() {
     done
     
     if [[ "$connectivity" == "true" ]]; then
-        print_success "Internet connectivity verified"
+        echo -e "${GREEN}✓ Internet connectivity verified${NC}"
     else
-        print_error "No internet connectivity detected"
-        print_info "Please check your network connection and try again"
+        echo -e "${RED}Error: No internet connectivity detected${NC}"
+        echo "Please check your network connection and try again"
         exit 1
     fi
 }
 
 # Install basic dependencies
 install_basic_dependencies() {
-    print_step "Installing Basic Dependencies"
+    echo -e "\n${BLUE}Installing Basic Dependencies...${NC}"
     
-    print_info "Updating package repository..."
-    if apt-get update &> /dev/null; then
-        print_success "Package repository updated"
-    else
-        print_error "Failed to update package repository"
-        exit 1
-    fi
+    echo "Updating package repository..."
+    apt-get update || { echo -e "${RED}Error: Failed to update package repository${NC}"; exit 1; }
     
-    print_info "Installing essential packages..."
+    echo "Installing essential packages..."
     local essential_packages=(
         "curl" "wget" "unzip" "tar" "gzip" "jq" "bc" 
         "uuid-runtime" "net-tools" "lsof" "cron" "logrotate"
         "openssl" "ca-certificates" "gnupg" "lsb-release"
     )
     
-    for package in "${essential_packages[@]}"; do
-        if apt-get install -y "$package" &> /dev/null; then
-            print_success "Installed: $package"
-        else
-            print_error "Failed to install: $package"
-            exit 1
-        fi
-    done
+    apt-get install -y "${essential_packages[@]}" || { echo -e "${RED}Error: Failed to install essential packages${NC}"; exit 1; }
+    echo -e "${GREEN}✓ Essential packages installed${NC}"
 }
 
 # Create directory structure
 create_directory_structure() {
-    print_step "Creating Directory Structure"
+    echo -e "\n${BLUE}Creating Directory Structure...${NC}"
     
     local directories=(
         "$INSTALL_DIR"
@@ -240,14 +208,9 @@ create_directory_structure() {
     )
     
     for dir in "${directories[@]}"; do
-        if mkdir -p "$dir" 2>/dev/null; then
-            chmod 755 "$dir"
-            print_success "Created: $dir"
-        else
-            print_error "Failed to create: $dir"
-            exit 1
-        fi
+        mkdir -p "$dir" && chmod 755 "$dir" || { echo -e "${RED}Error: Failed to create directory: $dir${NC}"; exit 1; }
     done
+    echo -e "${GREEN}✓ Directory structure created${NC}"
 }
 
 # Download file with retry mechanism
@@ -259,26 +222,26 @@ download_file_with_retry() {
     
     while [[ $attempt -lt $max_attempts ]]; do
         ((attempt++))
-        print_info "Downloading $(basename "$destination") (attempt $attempt/$max_attempts)..."
+        echo "Downloading $(basename "$destination") (attempt $attempt/$max_attempts)..."
         
         if wget -q --show-progress --timeout=30 --tries=2 -O "$destination" "$url"; then
-            print_success "Downloaded: $(basename "$destination")"
+            echo -e "${GREEN}✓ Downloaded: $(basename "$destination")${NC}"
             return 0
         else
-            print_warning "Download attempt $attempt failed"
+            echo -e "${YELLOW}Warning: Download attempt $attempt failed${NC}"
             if [[ $attempt -lt $max_attempts ]]; then
                 sleep 2
             fi
         fi
     done
     
-    print_error "Failed to download after $max_attempts attempts: $url"
+    echo -e "${RED}Error: Failed to download after $max_attempts attempts: $url${NC}"
     return 1
 }
 
 # Download and install autoscript files from GitHub
 download_autoscript_files() {
-    print_step "Downloading Autoscript Files from GitHub"
+    echo -e "\n${BLUE}Downloading Autoscript Files from GitHub...${NC}"
     
     # Define files to download with their destinations
     declare -A files_to_download=(
@@ -322,11 +285,11 @@ download_autoscript_files() {
     
     # Check if any downloads failed
     if [[ ${#failed_downloads[@]} -gt 0 ]]; then
-        print_error "Failed to download the following files:"
+        echo -e "${RED}Error: Failed to download the following files:${NC}"
         for file in "${failed_downloads[@]}"; do
-            print_error "  - $file"
+            echo "  - $file"
         done
-        print_info "Please check your internet connection and GitHub repository access"
+        echo "Please check your internet connection and GitHub repository access"
         exit 1
     fi
     
@@ -334,147 +297,130 @@ download_autoscript_files() {
     chmod -R 755 "$INSTALL_DIR"
     chmod 600 "$INSTALL_DIR/config/system.conf"
     
-    print_success "All autoscript files downloaded successfully"
+    echo -e "${GREEN}✓ All autoscript files downloaded successfully${NC}"
 }
 
 # Test GitHub connectivity
 test_github_connectivity() {
-    print_info "Testing GitHub connectivity..."
+    echo "Testing GitHub connectivity..."
     
     local test_url="$REPO_URL/README.md"
     if wget -q --spider --timeout=10 "$test_url"; then
-        print_success "GitHub repository accessible"
+        echo -e "${GREEN}✓ GitHub repository accessible${NC}"
         return 0
     else
-        print_error "Cannot access GitHub repository"
-        print_info "Repository: $REPO_URL"
-        print_info "Please check:"
-        print_info "1. Internet connectivity"
-        print_info "2. GitHub repository exists and is public"
-        print_info "3. Repository URL is correct"
+        echo -e "${RED}Error: Cannot access GitHub repository${NC}"
+        echo "Repository: $REPO_URL"
+        echo "Please check:"
+        echo "1. Internet connectivity"
+        echo "2. GitHub repository exists and is public"
+        echo "3. Repository URL is correct"
         return 1
     fi
 }
 
 # Run system optimization
 run_system_optimization() {
-    print_step "Running System Optimization"
+    echo -e "\n${BLUE}Running System Optimization...${NC}"
     
     if [[ -f "$INSTALL_DIR/scripts/system/optimize.sh" ]]; then
-        print_info "Running system optimization script..."
-        if bash "$INSTALL_DIR/scripts/system/optimize.sh"; then
-            print_success "System optimization completed"
-        else
-            print_warning "System optimization had some issues"
-        fi
+        echo "Running system optimization script..."
+        bash "$INSTALL_DIR/scripts/system/optimize.sh" || echo -e "${YELLOW}Warning: System optimization had some issues${NC}"
+        echo -e "${GREEN}✓ System optimization completed${NC}"
     else
-        print_error "System optimization script not found"
+        echo -e "${RED}Error: System optimization script not found${NC}"
         exit 1
     fi
 }
 
 # Install dependencies
 install_dependencies() {
-    print_step "Installing Service Dependencies"
+    echo -e "\n${BLUE}Installing Service Dependencies...${NC}"
     
     if [[ -f "$INSTALL_DIR/scripts/system/deps.sh" ]]; then
-        print_info "Running dependency installation script..."
-        if bash "$INSTALL_DIR/scripts/system/deps.sh"; then
-            print_success "Dependencies installed successfully"
-        else
-            print_error "Dependency installation failed"
-            exit 1
-        fi
+        echo "Running dependency installation script..."
+        bash "$INSTALL_DIR/scripts/system/deps.sh" || { echo -e "${RED}Error: Dependency installation failed${NC}"; exit 1; }
+        echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
     else
-        print_error "Dependency installation script not found"
+        echo -e "${RED}Error: Dependency installation script not found${NC}"
         exit 1
     fi
 }
 
 # Setup SSH services
 setup_ssh_services() {
-    print_step "Setting Up SSH Services"
+    echo -e "\n${BLUE}Setting Up SSH Services...${NC}"
     
     if [[ -f "$INSTALL_DIR/scripts/services/ssh.sh" ]]; then
-        print_info "Configuring SSH and Dropbear services..."
-        if bash "$INSTALL_DIR/scripts/services/ssh.sh"; then
-            print_success "SSH services configured successfully"
-        else
-            print_error "SSH services configuration failed"
-            exit 1
-        fi
+        echo "Configuring SSH and Dropbear services..."
+        bash "$INSTALL_DIR/scripts/services/ssh.sh" || { echo -e "${RED}Error: SSH services configuration failed${NC}"; exit 1; }
+        echo -e "${GREEN}✓ SSH services configured successfully${NC}"
     else
-        print_error "SSH setup script not found"
+        echo -e "${RED}Error: SSH setup script not found${NC}"
         exit 1
     fi
 }
 
 # Setup Xray services
 setup_xray_services() {
-    print_step "Setting Up Xray-core Services"
+    echo -e "\n${BLUE}Setting Up Xray-core Services...${NC}"
     
     if [[ -f "$INSTALL_DIR/scripts/services/xray.sh" ]]; then
-        print_info "Configuring Xray-core with VMess, VLESS, and Trojan..."
-        if bash "$INSTALL_DIR/scripts/services/xray.sh"; then
-            print_success "Xray-core configured successfully"
-        else
-            print_error "Xray-core configuration failed"
-            exit 1
-        fi
+        echo "Configuring Xray-core with VMess, VLESS, and Trojan..."
+        bash "$INSTALL_DIR/scripts/services/xray.sh" || { echo -e "${RED}Error: Xray-core configuration failed${NC}"; exit 1; }
+        echo -e "${GREEN}✓ Xray-core configured successfully${NC}"
     else
-        print_error "Xray setup script not found"
+        echo -e "${RED}Error: Xray setup script not found${NC}"
         exit 1
     fi
 }
 
 # Setup firewall
 setup_firewall() {
-    print_step "Configuring Firewall"
+    echo -e "\n${BLUE}Configuring Firewall...${NC}"
     
     if [[ -f "$INSTALL_DIR/scripts/system/firewall.sh" ]]; then
-        print_info "Running firewall configuration script..."
-        if bash "$INSTALL_DIR/scripts/system/firewall.sh"; then
-            print_success "Firewall configured successfully"
-        else
-            print_warning "Firewall configuration had issues"
-        fi
+        echo "Running firewall configuration script..."
+        bash "$INSTALL_DIR/scripts/system/firewall.sh" || echo -e "${YELLOW}Warning: Firewall configuration had issues${NC}"
     else
-        print_info "Installing and configuring UFW firewall manually..."
+        echo "Installing and configuring UFW firewall manually..."
         
         # Install UFW if not present
         if ! command -v ufw &> /dev/null; then
-            apt-get install -y ufw &> /dev/null
+            apt-get install -y ufw
         fi
         
         # Reset UFW to defaults
-        ufw --force reset &> /dev/null
+        ufw --force reset
         
         # Set default policies
-        ufw default deny incoming &> /dev/null
-        ufw default allow outgoing &> /dev/null
+        ufw default deny incoming
+        ufw default allow outgoing
         
         # Allow SSH ports
-        ufw allow 22/tcp comment "SSH" &> /dev/null
-        ufw allow 109/tcp comment "Dropbear SSH" &> /dev/null
-        ufw allow 143/tcp comment "Dropbear WebSocket" &> /dev/null
+        ufw allow 22/tcp comment "SSH"
+        ufw allow 109/tcp comment "Dropbear SSH"
+        ufw allow 143/tcp comment "Dropbear WebSocket"
         
         # Allow Xray ports
-        ufw allow 80/tcp comment "Xray VMess/VLESS" &> /dev/null
-        ufw allow 443/tcp comment "Xray TLS" &> /dev/null
+        ufw allow 8080/tcp comment "Xray VMess TCP"
+        ufw allow 8081/tcp comment "Xray VLESS TCP"
+        ufw allow 443/tcp comment "Xray TLS"
+        ufw allow 8443/tcp comment "Xray Trojan TCP"
         
         # Allow WebSocket port
-        ufw allow 8880/tcp comment "SSH WebSocket" &> /dev/null
+        ufw allow 8880/tcp comment "SSH WebSocket"
         
         # Enable UFW
-        ufw --force enable &> /dev/null
-        
-        print_success "Firewall configured and enabled"
+        ufw --force enable
     fi
+    
+    echo -e "${GREEN}✓ Firewall configured and enabled${NC}"
 }
 
 # Create management commands
 create_management_commands() {
-    print_step "Creating Management Commands"
+    echo -e "\n${BLUE}Creating Management Commands...${NC}"
     
     # Create main menu script
     cat > "$BIN_DIR/autoscript" << 'EOF'
@@ -747,15 +693,15 @@ EOF
         ln -sf "$INSTALL_DIR/scripts/accounts/ssh-account.sh" "$BIN_DIR/ssh-account"
     fi
     
-    print_success "Management commands created"
-    print_info "Main menu: autoscript"
-    print_info "SSH accounts: ssh-account"
-    print_info "Xray clients: xray-client (if Xray is installed)"
+    echo -e "${GREEN}✓ Management commands created${NC}"
+    echo "Main menu: autoscript"
+    echo "SSH accounts: ssh-account"
+    echo "Xray clients: xray-client (if Xray is installed)"
 }
 
 # Setup cron jobs for maintenance
 setup_cron_jobs() {
-    print_step "Setting Up Maintenance Tasks"
+    echo -e "\n${BLUE}Setting Up Maintenance Tasks...${NC}"
     
     # Create cron job for account cleanup
     cat > /tmp/autoscript_cron << EOF
@@ -774,12 +720,12 @@ EOF
     crontab /tmp/autoscript_cron
     rm /tmp/autoscript_cron
     
-    print_success "Maintenance tasks scheduled"
+    echo -e "${GREEN}✓ Maintenance tasks scheduled${NC}"
 }
 
 # Final verification
 verify_installation() {
-    print_step "Verifying Installation"
+    echo -e "\n${BLUE}Verifying Installation...${NC}"
     
     local verification_failed=false
     
@@ -792,9 +738,9 @@ verify_installation() {
     
     for file in "${essential_files[@]}"; do
         if [[ -f "$file" ]]; then
-            print_success "✓ $file"
+            echo -e "${GREEN}✓ $file${NC}"
         else
-            print_error "✗ $file"
+            echo -e "${RED}✗ $file${NC}"
             verification_failed=true
         fi
     done
@@ -804,9 +750,9 @@ verify_installation() {
     
     for service in "${services[@]}"; do
         if systemctl is-active --quiet "$service"; then
-            print_success "✓ $service service"
+            echo -e "${GREEN}✓ $service service${NC}"
         else
-            print_error "✗ $service service"
+            echo -e "${RED}✗ $service service${NC}"
             verification_failed=true
         fi
     done
@@ -816,18 +762,18 @@ verify_installation() {
     
     for cmd in "${commands[@]}"; do
         if command -v "$cmd" &> /dev/null; then
-            print_success "✓ $cmd command"
+            echo -e "${GREEN}✓ $cmd command${NC}"
         else
-            print_error "✗ $cmd command"
+            echo -e "${RED}✗ $cmd command${NC}"
             verification_failed=true
         fi
     done
     
     if [[ "$verification_failed" == "true" ]]; then
-        print_error "Installation verification failed"
+        echo -e "${RED}Installation verification failed${NC}"
         exit 1
     else
-        print_success "Installation verification passed"
+        echo -e "${GREEN}Installation verification passed${NC}"
     fi
 }
 
@@ -872,7 +818,7 @@ show_installation_summary() {
     echo "WebSocket Port: ${WHITE}8880${NC}"
     
     echo -e "\n${CYAN}Installation Method:${NC}"
-    echo "✓ Downloaded from GitHub via wget"
+    echo "✓ Downloaded from GitHub via curl"
     echo "✓ One-command installation"
     echo "✓ Remote installation capability"
     
@@ -914,7 +860,7 @@ parse_args() {
                 exit 0
                 ;;
             *)
-                print_error "Unknown option: $1"
+                echo -e "${RED}Error: Unknown option: $1${NC}"
                 show_help
                 exit 1
                 ;;
@@ -970,7 +916,7 @@ prompt_user() {
             fi
         else
             echo
-            print_warning "Timeout reached, using default answer: $default"
+            echo -e "${YELLOW}Warning: Timeout reached, using default answer: $default${NC}"
             if [[ "$default" =~ ^[Yy]$ ]]; then
                 return 0
             else
@@ -979,7 +925,7 @@ prompt_user() {
         fi
     else
         # Running via pipe - use default
-        print_info "Non-interactive mode detected, using default: $default"
+        echo -e "${YELLOW}Warning: Non-interactive mode detected, using default: $default${NC}"
         if [[ "$default" =~ ^[Yy]$ ]]; then
             return 0
         else
@@ -997,17 +943,17 @@ main() {
     if [[ ! -t 0 ]]; then
         INTERACTIVE_MODE=false
         AUTO_YES=true
-        print_info "Pipe input detected - enabling non-interactive mode"
+        echo -e "${YELLOW}Warning: Pipe input detected - enabling non-interactive mode${NC}"
     fi
     
     # Check if already installed
     if [[ -f "$INSTALL_DIR/utils/common.sh" ]]; then
-        print_warning "Autoscript appears to be already installed"
+        echo -e "${YELLOW}Warning: Autoscript appears to be already installed${NC}"
         
         if [[ "$FORCE_INSTALL" == "true" ]]; then
-            print_info "Force installation enabled, proceeding with reinstallation..."
+            echo -e "${YELLOW}Warning: Force installation enabled, proceeding with reinstallation...${NC}"
         elif prompt_user "Do you want to reinstall? (y/N): " "N" 15; then
-            print_info "Proceeding with reinstallation..."
+            echo -e "${YELLOW}Proceeding with reinstallation...${NC}"
         else
             echo "Installation cancelled"
             exit 0
@@ -1016,23 +962,25 @@ main() {
     
     print_banner
     
-    print_info "Starting Modern Tunneling Autoscript installation..."
-    print_info "Repository: $REPO_URL"
-    print_info "This will install and configure tunneling services on your server"
+    echo -e "${CYAN}Starting Modern Tunneling Autoscript installation...${NC}"
+    echo "Repository: $REPO_URL"
+    echo "This will install and configure tunneling services on your server"
     echo ""
     
     # Ask for installation confirmation
     if [[ "$AUTO_YES" != "true" ]]; then
-        if ! prompt_user "Do you want to continue with the installation? (y/N): " "N" 30; then
+        read -p "Do you want to continue with the installation? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             echo "Installation cancelled"
             exit 0
         fi
     else
-        print_info "Auto-confirmation enabled, proceeding with installation..."
+        echo "Auto-confirmation enabled, proceeding with installation..."
     fi
     
     echo ""
-    print_info "Installation started..."
+    echo "Installation started..."
     
     # Run installation steps
     check_system_compatibility
@@ -1040,7 +988,7 @@ main() {
     
     # Test GitHub connectivity before proceeding
     if ! test_github_connectivity; then
-        print_error "Cannot proceed without GitHub access"
+        echo -e "${RED}Error: Cannot proceed without GitHub access${NC}"
         exit 1
     fi
     
@@ -1059,19 +1007,18 @@ main() {
     # Show summary
     show_installation_summary
     
-    # Start main menu
-    if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ "$AUTO_YES" != "true" ]]; then
-        # Interactive mode - wait for user input with timeout
-        if timeout 30 bash -c 'read -p "Press Enter to open the management panel (timeout in 30s)..."' 2>/dev/null; then
-            exec autoscript
-        else
-            echo
-            print_info "Timeout reached. You can run 'autoscript' command later to access the management panel"
-        fi
+    # Ask to restart system
+    echo ""
+    read -p "Do you want to restart the system now? (recommended) (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "System will restart in 5 seconds..."
+        sleep 5
+        reboot
     else
-        # Non-interactive mode
-        print_info "Installation completed in non-interactive mode"
-        print_info "You can run 'autoscript' command to access the management panel"
+        echo ""
+        echo "Installation completed! Please restart the system manually when convenient."
+        echo "You can run 'autoscript' command to access the management panel."
     fi
 }
 
