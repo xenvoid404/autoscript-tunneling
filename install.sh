@@ -907,12 +907,19 @@ main() {
     print_info "This will install and configure tunneling services on your server"
     echo ""
     
-    # Confirmation
-    read -p "Do you want to continue with the installation? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Installation cancelled"
-        exit 0
+    # Auto-confirm if script is running via pipe (non-interactive)
+    if [[ -t 0 ]]; then
+        # Interactive mode - ask for confirmation
+        read -p "Do you want to continue with the installation? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Installation cancelled"
+            exit 0
+        fi
+    else
+        # Non-interactive mode (via pipe) - auto-confirm
+        print_info "Running in non-interactive mode, auto-confirming installation..."
+        echo "Continuing with installation..."
     fi
     
     echo ""
@@ -944,8 +951,15 @@ main() {
     show_installation_summary
     
     # Start main menu
-    read -p "Press Enter to open the management panel..."
-    exec autoscript
+    if [[ -t 0 ]]; then
+        # Interactive mode
+        read -p "Press Enter to open the management panel..."
+        exec autoscript
+    else
+        # Non-interactive mode
+        print_info "Installation completed in non-interactive mode"
+        print_info "You can run 'autoscript' command to access the management panel"
+    fi
 }
 
 # Run main function
