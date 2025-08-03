@@ -308,3 +308,98 @@ Jika script ini berguna, please give a star ⭐ pada repository ini!
 **Version**: 2.0.0  
 **Last Updated**: 2024  
 **Tested On**: Debian 11+, Ubuntu 22.04+
+
+# Installation Options
+
+## Interactive Installation (Default)
+```bash
+# Download and run with user prompts
+wget -O install.sh https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+## Non-Interactive Installation (Recommended for Automation)
+
+### Quick Install (Fully Automated)
+```bash
+# One-command installation - completely automated
+curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
+
+# Or with wget
+wget -O - https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
+```
+
+### Manual Installation with Options
+```bash
+# Download first, then run with options
+wget -O install.sh https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh
+chmod +x install.sh
+
+# Non-interactive mode (no user prompts)
+./install.sh --non-interactive
+
+# Auto-answer yes to all prompts
+./install.sh --yes
+
+# Force reinstallation even if already installed
+./install.sh --force --yes
+
+# Show help
+./install.sh --help
+```
+
+### Advanced Usage
+```bash
+# Via curl with options
+curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh | bash -s -- --non-interactive
+
+# Force reinstall via pipe
+curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/install.sh | bash -s -- --force --yes
+
+# Quick install with custom options
+curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash -s -- --force
+```
+
+## Installation Options Reference
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--non-interactive` | - | Run in completely non-interactive mode (no user input required) |
+| `--yes` | `-y` | Automatically answer "yes" to all prompts |
+| `--force` | `-f` | Force reinstallation even if already installed |
+| `--help` | `-h` | Show help information |
+
+## Timeout Handling
+
+The installation script now includes automatic timeout handling:
+- User prompts timeout after 30 seconds with default answers
+- Non-interactive mode is automatically detected when running via pipe
+- No more hanging installations waiting for user input
+
+## Troubleshooting Installation Issues
+
+### Script Hangs or Gets Stuck
+If you experience hanging during installation:
+
+1. **Use non-interactive mode:**
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
+   ```
+
+2. **Use timeout-safe installation:**
+   ```bash
+   ./install.sh --yes
+   ```
+
+3. **For automation/CI:**
+   ```bash
+   ./install.sh --non-interactive --force
+   ```
+
+### Common Scenarios
+
+- **Docker/Container environments:** Use `--non-interactive`
+- **CI/CD pipelines:** Use `--non-interactive --force`
+- **Remote servers:** Use the quick-install method
+- **Reinstallation:** Use `--force --yes`

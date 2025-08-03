@@ -9,6 +9,9 @@
 # or
 #
 # curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash
+#
+# With options:
+# curl -fsSL https://raw.githubusercontent.com/your-repo/modern-tunneling-autoscript/main/quick-install.sh | bash -s -- --force --yes
 
 set -e
 
@@ -144,6 +147,24 @@ check_internet() {
     fi
 }
 
+# Parse command line arguments
+parse_args() {
+    INSTALLER_ARGS=""
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force|-f|--yes|-y|--non-interactive|--help|-h)
+                INSTALLER_ARGS="$INSTALLER_ARGS $1"
+                shift
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                echo "Available options: --force, --yes, --non-interactive, --help"
+                exit 1
+                ;;
+        esac
+    done
+}
+
 # Download and run main installer
 download_and_run() {
     print_info "Downloading main installer from GitHub..."
@@ -157,10 +178,18 @@ download_and_run() {
         chmod +x "$temp_installer"
         
         print_info "Starting main installation..."
+        if [[ -n "$INSTALLER_ARGS" ]]; then
+            print_info "Using arguments: $INSTALLER_ARGS"
+        fi
         echo ""
         
-        # Run the main installer
-        exec bash "$temp_installer"
+        # Run the main installer with arguments
+        if [[ -n "$INSTALLER_ARGS" ]]; then
+            exec bash "$temp_installer" $INSTALLER_ARGS
+        else
+            # Default to non-interactive mode for quick install
+            exec bash "$temp_installer" --non-interactive
+        fi
     else
         print_error "Failed to download installer"
         print_info "URL: $INSTALLER_URL"
@@ -174,6 +203,9 @@ download_and_run() {
 
 # Main function
 main() {
+    # Parse command line arguments first
+    parse_args "$@"
+    
     print_banner
     
     echo -e "${CYAN}Repository:${NC} https://github.com/${GITHUB_USER}/${GITHUB_REPO}"
@@ -181,6 +213,12 @@ main() {
     echo ""
     
     print_info "Quick installation started..."
+    if [[ -n "$INSTALLER_ARGS" ]]; then
+        print_info "Installation mode: Custom arguments"
+    else
+        print_info "Installation mode: Non-interactive (default for quick install)"
+    fi
+    echo ""
     
     # Pre-flight checks
     check_root

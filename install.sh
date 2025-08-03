@@ -887,14 +887,128 @@ show_installation_summary() {
     echo ""
 }
 
+# Global variables for installation mode
+FORCE_INSTALL=false
+AUTO_YES=false
+INTERACTIVE_MODE=true
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force|-f)
+                FORCE_INSTALL=true
+                shift
+                ;;
+            --yes|-y)
+                AUTO_YES=true
+                shift
+                ;;
+            --non-interactive)
+                INTERACTIVE_MODE=false
+                AUTO_YES=true
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Show help information
+show_help() {
+    echo "Modern Tunneling Autoscript - Installation Options"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --force, -f           Force reinstallation even if already installed"
+    echo "  --yes, -y             Automatically answer yes to all prompts"
+    echo "  --non-interactive     Run in completely non-interactive mode"
+    echo "  --help, -h            Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                    # Interactive installation"
+    echo "  $0 --yes             # Auto-confirm all prompts"
+    echo "  $0 --force --yes     # Force reinstall with auto-confirm"
+    echo "  curl -sSL url | bash -s -- --non-interactive"
+}
+
+# Enhanced user prompt with timeout and auto-answer
+prompt_user() {
+    local message="$1"
+    local default="${2:-N}"
+    local timeout="${3:-30}"
+    
+    # Non-interactive mode or auto-yes
+    if [[ "$INTERACTIVE_MODE" == "false" ]] || [[ "$AUTO_YES" == "true" ]]; then
+        if [[ "$default" =~ ^[Yy]$ ]]; then
+            echo "y"
+            return 0
+        else
+            echo "n"
+            return 1
+        fi
+    fi
+    
+    # Interactive mode with timeout
+    if [[ -t 0 ]]; then
+        local reply
+        if timeout "$timeout" bash -c "read -p '$message' -n 1 -r reply; echo \$reply" 2>/dev/null; then
+            echo
+            if [[ $reply =~ ^[Yy]$ ]]; then
+                return 0
+            else
+                return 1
+            fi
+        else
+            echo
+            print_warning "Timeout reached, using default answer: $default"
+            if [[ "$default" =~ ^[Yy]$ ]]; then
+                return 0
+            else
+                return 1
+            fi
+        fi
+    else
+        # Running via pipe - use default
+        print_info "Non-interactive mode detected, using default: $default"
+        if [[ "$default" =~ ^[Yy]$ ]]; then
+            return 0
+        else
+            return 1
+        fi
+    fi
+}
+
 # Main installation function
 main() {
+    # Parse command line arguments first
+    parse_args "$@"
+    
+    # Detect if running via pipe and adjust settings
+    if [[ ! -t 0 ]]; then
+        INTERACTIVE_MODE=false
+        AUTO_YES=true
+        print_info "Pipe input detected - enabling non-interactive mode"
+    fi
+    
     # Check if already installed
     if [[ -f "$INSTALL_DIR/utils/common.sh" ]]; then
         print_warning "Autoscript appears to be already installed"
-        read -p "Do you want to reinstall? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        
+        if [[ "$FORCE_INSTALL" == "true" ]]; then
+            print_info "Force installation enabled, proceeding with reinstallation..."
+        elif prompt_user "Do you want to reinstall? (y/N): " "N" 15; then
+            print_info "Proceeding with reinstallation..."
+        else
             echo "Installation cancelled"
             exit 0
         fi
@@ -907,19 +1021,14 @@ main() {
     print_info "This will install and configure tunneling services on your server"
     echo ""
     
-    # Auto-confirm if script is running via pipe (non-interactive)
-    if [[ -t 0 ]]; then
-        # Interactive mode - ask for confirmation
-        read -p "Do you want to continue with the installation? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    # Ask for installation confirmation
+    if [[ "$AUTO_YES" != "true" ]]; then
+        if ! prompt_user "Do you want to continue with the installation? (y/N): " "N" 30; then
             echo "Installation cancelled"
             exit 0
         fi
     else
-        # Non-interactive mode (via pipe) - auto-confirm
-        print_info "Running in non-interactive mode, auto-confirming installation..."
-        echo "Continuing with installation..."
+        print_info "Auto-confirmation enabled, proceeding with installation..."
     fi
     
     echo ""
@@ -951,10 +1060,14 @@ main() {
     show_installation_summary
     
     # Start main menu
-    if [[ -t 0 ]]; then
-        # Interactive mode
-        read -p "Press Enter to open the management panel..."
-        exec autoscript
+    if [[ "$INTERACTIVE_MODE" == "true" ]] && [[ "$AUTO_YES" != "true" ]]; then
+        # Interactive mode - wait for user input with timeout
+        if timeout 30 bash -c 'read -p "Press Enter to open the management panel (timeout in 30s)..."' 2>/dev/null; then
+            exec autoscript
+        else
+            echo
+            print_info "Timeout reached. You can run 'autoscript' command later to access the management panel"
+        fi
     else
         # Non-interactive mode
         print_info "Installation completed in non-interactive mode"
