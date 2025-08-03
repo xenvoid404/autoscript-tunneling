@@ -4,30 +4,20 @@
 # Production-ready tunneling solution for Debian 11+ and Ubuntu 22.04+
 # 
 # Author: Yuipedia
-# Version: 2.0.0
+# Version: 3.0.0
 # License: MIT
 #
 # Quick Install:
 # curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash
 
-# Exit on any error
 set -e
-
-# Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly PURPLE='\033[0;35m'
-readonly CYAN='\033[0;36m'
-readonly WHITE='\033[1;37m'
-readonly NC='\033[0m' 
 
 # Installation directories
 readonly INSTALL_DIR="/opt/autoscript"
 readonly CONFIG_DIR="/etc/autoscript"
 readonly BIN_DIR="/usr/local/bin"
 readonly LOG_DIR="/var/log/autoscript"
+readonly XRAY_CONFIG_DIR="/etc/xray"
 
 # GitHub repository configuration
 readonly GITHUB_USER="xenvoid404"
@@ -35,32 +25,40 @@ readonly GITHUB_REPO="autoscript-tunneling"
 readonly GITHUB_BRANCH="master"
 readonly REPO_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}"
 
-# Print functions
+# Source common utilities
+source_utilities() {
+    if [[ -f "$INSTALL_DIR/utils/common.sh" ]]; then
+        source "$INSTALL_DIR/utils/common.sh"
+    else
+        echo "Error: Common utilities not found"
+        exit 1
+    fi
+}
+
+# Print banner
 print_banner() {
     clear
-    echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════╗"
-    echo "║               Modern Tunneling Autoscript               ║"
-    echo "║                    Version 2.0.0                        ║"
-    echo "║                                                          ║"
-    echo "║  Production-ready tunneling solution with:              ║"
-    echo "║  • SSH & Dropbear SSH                                   ║"
-    echo "║  • Xray-core (VMess, VLESS, Trojan)                    ║"
-    echo "║  • WebSocket tunneling                                   ║"
-    echo "║  • Advanced account management                           ║"
-    echo "║  • System optimization                                   ║"
-    echo "║                                                          ║"
-    echo "║  Compatible: Debian 11+ | Ubuntu 22.04+                ║"
-    echo "║  Installation: One-command via curl                     ║"
-    echo "╚══════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
+    echo "=============================================================="
+    echo "               Modern Tunneling Autoscript"
+    echo "                    Version 3.0.0"
+    echo ""
+    echo "  Production-ready tunneling solution with:"
+    echo "  • SSH & Dropbear SSH"
+    echo "  • Xray-core (VMess, VLESS, Trojan) - Separated Services"
+    echo "  • WebSocket tunneling with Nginx"
+    echo "  • Advanced account management"
+    echo "  • System optimization"
+    echo ""
+    echo "  Compatible: Debian 11+ | Ubuntu 22.04+"
+    echo "  Installation: One-command via curl"
+    echo "=============================================================="
 }
 
 # System compatibility check
 check_system_compatibility() {
     # Check if running as root
     if [[ $EUID -ne 0 ]]; then
-        echo -e "${RED}Error: This script must be run as root${NC}"
+        echo "Error: This script must be run as root"
         echo "Please run: sudo $0"
         exit 1
     fi
@@ -71,7 +69,7 @@ check_system_compatibility() {
         OS=$NAME
         VER=$VERSION_ID
     else
-        echo -e "${RED}Error: Cannot detect OS information${NC}"
+        echo "Error: Cannot detect OS information"
         exit 1
     fi
     
@@ -88,129 +86,92 @@ check_system_compatibility() {
         local v2_minor=$(echo "$version2" | cut -d. -f2 2>/dev/null || echo "0")
         
         # Handle fractional parts properly
-        # For versions like 11.9, convert to 1190 (11 * 100 + 90)
-        # For integer versions like 11, convert to 1100 (11 * 100 + 0)
         if [[ "$v1_minor" =~ ^[0-9]+$ ]] && [[ ${#v1_minor} -eq 1 ]]; then
-            v1_minor=$((v1_minor * 10))  # 9 becomes 90
+            v1_minor=$((v1_minor * 10))
         fi
         if [[ "$v2_minor" =~ ^[0-9]+$ ]] && [[ ${#v2_minor} -eq 1 ]]; then
-            v2_minor=$((v2_minor * 10))  # 9 becomes 90
+            v2_minor=$((v2_minor * 10))
         fi
         
         local v1_int=$((v1_major * 100 + v1_minor))
         local v2_int=$((v2_major * 100 + v2_minor))
         
         case $operator in
-            ">=")
-                [[ $v1_int -ge $v2_int ]]
-                ;;
-            ">")
-                [[ $v1_int -gt $v2_int ]]
-                ;;
-            "=")
-                [[ $v1_int -eq $v2_int ]]
-                ;;
-            "<")
-                [[ $v1_int -lt $v2_int ]]
-                ;;
-            "<=")
-                [[ $v1_int -le $v2_int ]]
-                ;;
-            *)
-                return 1
-                ;;
+            ">=") [[ $v1_int -ge $v2_int ]] ;;
+            ">") [[ $v1_int -gt $v2_int ]] ;;
+            "=") [[ $v1_int -eq $v2_int ]] ;;
+            "<") [[ $v1_int -lt $v2_int ]] ;;
+            "<=") [[ $v1_int -le $v2_int ]] ;;
+            *) return 1 ;;
         esac
     }
-
+    
     # Check OS compatibility
     case $OS in
         "Ubuntu")
             if ! version_compare "$VER" ">=" "22.04"; then
-                echo -e "${RED}Error: Ubuntu 22.04+ required. Current: $VER${NC}"
+                echo "Error: Ubuntu 22.04+ required. Current: $VER"
                 exit 1
             fi
             ;;
         "Debian GNU/Linux")
             if ! version_compare "$VER" ">=" "11"; then
-                echo -e "${RED}Error: Debian 11+ required. Current: $VER${NC}"
+                echo "Error: Debian 11+ required. Current: $VER"
                 exit 1
             fi
             ;;
         *)
-            echo -e "${RED}Error: Unsupported OS: $OS${NC}"
-            echo "Supported: Debian 11+ or Ubuntu 22.04+"
+            echo "Error: Unsupported OS: $OS"
+            echo "Supported: Ubuntu 22.04+ or Debian 11+"
             exit 1
             ;;
     esac
     
-    echo -e "${GREEN}✓ OS compatibility check passed: $OS $VER${NC}"
+    echo "System compatibility check passed: $OS $VER"
 }
 
 # Check internet connectivity
 check_internet() {
     echo "Checking internet connectivity..."
-    
-    # Test connectivity to multiple servers
-    local test_hosts=("8.8.8.8" "1.1.1.1" "github.com")
-    local connectivity=false
-    
-    for host in "${test_hosts[@]}"; do
-        if ping -c 1 -W 3 "$host" &> /dev/null; then
-            connectivity=true
-            break
-        fi
-    done
-    
-    if [[ "$connectivity" == "true" ]]; then
-        echo -e "${GREEN}✓ Internet connectivity verified${NC}"
+    if ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+        echo "Internet connectivity: OK"
+        return 0
     else
-        echo -e "${RED}Error: No internet connectivity detected${NC}"
-        echo "Please check your network connection and try again"
-        exit 1
+        echo "Error: No internet connectivity detected"
+        return 1
     fi
-}
-
-# Install basic dependencies
-install_basic_dependencies() {
-    echo -e "\n${BLUE}Installing Basic Dependencies...${NC}"
-    
-    echo "Updating package repository..."
-    apt-get update || { echo -e "${RED}Error: Failed to update package repository${NC}"; exit 1; }
-    
-    echo "Installing essential packages..."
-    local essential_packages=(
-        "curl" "wget" "unzip" "tar" "gzip" "jq" "bc" 
-        "uuid-runtime" "net-tools" "lsof" "cron" "logrotate"
-        "openssl" "ca-certificates" "gnupg" "lsb-release"
-    )
-    
-    apt-get install -y "${essential_packages[@]}" || { echo -e "${RED}Error: Failed to install essential packages${NC}"; exit 1; }
-    echo -e "${GREEN}✓ Essential packages installed${NC}"
 }
 
 # Create directory structure
 create_directory_structure() {
-    echo -e "\n${BLUE}Creating Directory Structure...${NC}"
+    echo "Creating directory structure..."
     
     local directories=(
         "$INSTALL_DIR"
-        "$INSTALL_DIR/scripts/system"
+        "$INSTALL_DIR/scripts"
         "$INSTALL_DIR/scripts/services"
-        "$INSTALL_DIR/scripts/accounts"
+        "$INSTALL_DIR/scripts/accounts" 
+        "$INSTALL_DIR/scripts/system"
         "$INSTALL_DIR/utils"
         "$INSTALL_DIR/config"
         "$CONFIG_DIR"
         "$CONFIG_DIR/accounts"
         "$LOG_DIR"
+        "$XRAY_CONFIG_DIR"
         "/var/lib/autoscript"
         "/usr/local/bin/autoscript-mgmt"
         "/usr/local/bin/xray-mgmt"
     )
     
     for dir in "${directories[@]}"; do
-        mkdir -p "$dir" && chmod 755 "$dir" || { echo -e "${RED}Error: Failed to create directory: $dir${NC}"; exit 1; }
+        if mkdir -p "$dir" && chmod 755 "$dir"; then
+            echo "Created directory: $dir"
+        else
+            echo "Error: Failed to create directory: $dir"
+            exit 1
+        fi
     done
-    echo -e "${GREEN}✓ Directory structure created${NC}"
+    echo "Directory structure created successfully"
 }
 
 # Download file with retry mechanism
@@ -225,34 +186,36 @@ download_file_with_retry() {
         echo "Downloading $(basename "$destination") (attempt $attempt/$max_attempts)..."
         
         if wget -q --show-progress --timeout=30 --tries=2 -O "$destination" "$url"; then
-            echo -e "${GREEN}✓ Downloaded: $(basename "$destination")${NC}"
+            echo "Downloaded: $(basename "$destination")"
             return 0
         else
-            echo -e "${YELLOW}Warning: Download attempt $attempt failed${NC}"
+            echo "Download attempt $attempt failed"
             if [[ $attempt -lt $max_attempts ]]; then
                 sleep 2
             fi
         fi
     done
     
-    echo -e "${RED}Error: Failed to download after $max_attempts attempts: $url${NC}"
+    echo "Error: Failed to download after $max_attempts attempts: $url"
     return 1
 }
 
 # Download and install autoscript files from GitHub
 download_autoscript_files() {
-    echo -e "\n${BLUE}Downloading Autoscript Files from GitHub...${NC}"
+    echo "Downloading Autoscript Files from GitHub..."
     
     # Define files to download with their destinations
     declare -A files_to_download=(
         # Utility files
         ["utils/common.sh"]="$INSTALL_DIR/utils/common.sh"
-        ["utils/logger.sh"]="$INSTALL_DIR/utils/logger.sh"
         ["utils/validator.sh"]="$INSTALL_DIR/utils/validator.sh"
         
         # Configuration files
         ["config/system.conf"]="$INSTALL_DIR/config/system.conf"
-        ["config/xray.json"]="$INSTALL_DIR/config/xray.json"
+        ["config/vmess.json"]="$INSTALL_DIR/config/vmess.json"
+        ["config/vless.json"]="$INSTALL_DIR/config/vless.json"
+        ["config/trojan.json"]="$INSTALL_DIR/config/trojan.json"
+        ["config/nginx.conf"]="$INSTALL_DIR/config/nginx.conf"
         
         # System scripts
         ["scripts/system/deps.sh"]="$INSTALL_DIR/scripts/system/deps.sh"
@@ -261,11 +224,21 @@ download_autoscript_files() {
         
         # Service scripts
         ["scripts/services/ssh.sh"]="$INSTALL_DIR/scripts/services/ssh.sh"
-        ["scripts/services/xray.sh"]="$INSTALL_DIR/scripts/services/xray.sh"
         
         # Account management scripts
         ["scripts/accounts/ssh-account.sh"]="$INSTALL_DIR/scripts/accounts/ssh-account.sh"
+        
+        # Xray client management script
+        ["scripts/xray-client.sh"]="$INSTALL_DIR/scripts/xray-client.sh"
+        
+        # Systemd service files
+        ["systemd/xray-vmess.service"]="$INSTALL_DIR/systemd/xray-vmess.service"
+        ["systemd/xray-vless.service"]="$INSTALL_DIR/systemd/xray-vless.service"
+        ["systemd/xray-trojan.service"]="$INSTALL_DIR/systemd/xray-trojan.service"
     )
+    
+    # Create systemd directory
+    mkdir -p "$INSTALL_DIR/systemd"
     
     # Download all files
     local failed_downloads=()
@@ -285,7 +258,7 @@ download_autoscript_files() {
     
     # Check if any downloads failed
     if [[ ${#failed_downloads[@]} -gt 0 ]]; then
-        echo -e "${RED}Error: Failed to download the following files:${NC}"
+        echo "Error: Failed to download the following files:"
         for file in "${failed_downloads[@]}"; do
             echo "  - $file"
         done
@@ -297,7 +270,7 @@ download_autoscript_files() {
     chmod -R 755 "$INSTALL_DIR"
     chmod 600 "$INSTALL_DIR/config/system.conf"
     
-    echo -e "${GREEN}✓ All autoscript files downloaded successfully${NC}"
+    echo "All autoscript files downloaded successfully"
 }
 
 # Test GitHub connectivity
@@ -306,10 +279,10 @@ test_github_connectivity() {
     
     local test_url="$REPO_URL/README.md"
     if wget -q --spider --timeout=10 "$test_url"; then
-        echo -e "${GREEN}✓ GitHub repository accessible${NC}"
+        echo "GitHub repository accessible"
         return 0
     else
-        echo -e "${RED}Error: Cannot access GitHub repository${NC}"
+        echo "Error: Cannot access GitHub repository"
         echo "Repository: $REPO_URL"
         echo "Please check:"
         echo "1. Internet connectivity"
@@ -319,74 +292,200 @@ test_github_connectivity() {
     fi
 }
 
-# Run system optimization
-run_system_optimization() {
-    echo -e "\n${BLUE}Running System Optimization...${NC}"
-    
-    if [[ -f "$INSTALL_DIR/scripts/system/optimize.sh" ]]; then
-        echo "Running system optimization script..."
-        bash "$INSTALL_DIR/scripts/system/optimize.sh" || echo -e "${YELLOW}Warning: System optimization had some issues${NC}"
-        echo -e "${GREEN}✓ System optimization completed${NC}"
-    else
-        echo -e "${RED}Error: System optimization script not found${NC}"
-        exit 1
-    fi
-}
-
 # Install dependencies
 install_dependencies() {
-    echo -e "\n${BLUE}Installing Service Dependencies...${NC}"
+    echo "Installing Service Dependencies..."
     
     if [[ -f "$INSTALL_DIR/scripts/system/deps.sh" ]]; then
         echo "Running dependency installation script..."
-        bash "$INSTALL_DIR/scripts/system/deps.sh" || { echo -e "${RED}Error: Dependency installation failed${NC}"; exit 1; }
-        echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
+        bash "$INSTALL_DIR/scripts/system/deps.sh" || {
+            echo "Error: Dependency installation failed"
+            exit 1
+        }
+        echo "Dependencies installed successfully"
     else
-        echo -e "${RED}Error: Dependency installation script not found${NC}"
+        echo "Error: Dependency installation script not found"
         exit 1
     fi
 }
 
 # Setup SSH services
 setup_ssh_services() {
-    echo -e "\n${BLUE}Setting Up SSH Services...${NC}"
+    echo "Setting Up SSH Services..."
     
     if [[ -f "$INSTALL_DIR/scripts/services/ssh.sh" ]]; then
         echo "Configuring SSH and Dropbear services..."
-        bash "$INSTALL_DIR/scripts/services/ssh.sh" || { echo -e "${RED}Error: SSH services configuration failed${NC}"; exit 1; }
-        echo -e "${GREEN}✓ SSH services configured successfully${NC}"
+        bash "$INSTALL_DIR/scripts/services/ssh.sh" || {
+            echo "Error: SSH services configuration failed"
+            exit 1
+        }
+        echo "SSH services configured successfully"
     else
-        echo -e "${RED}Error: SSH setup script not found${NC}"
+        echo "Error: SSH setup script not found"
         exit 1
     fi
 }
 
-# Setup Xray services
+# Setup separated Xray services
 setup_xray_services() {
-    echo -e "\n${BLUE}Setting Up Xray-core Services...${NC}"
+    echo "Setting Up Xray-core Services (Separated)..."
     
-    if [[ -f "$INSTALL_DIR/scripts/services/xray.sh" ]]; then
-        echo "Configuring Xray-core with VMess, VLESS, and Trojan..."
-        bash "$INSTALL_DIR/scripts/services/xray.sh" || { echo -e "${RED}Error: Xray-core configuration failed${NC}"; exit 1; }
-        echo -e "${GREEN}✓ Xray-core configured successfully${NC}"
+    # Install Xray-core if not present
+    if ! command -v xray >/dev/null 2>&1; then
+        echo "Installing Xray-core..."
+        bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    fi
+    
+    # Copy configuration files
+    echo "Installing Xray configuration files..."
+    cp "$INSTALL_DIR/config/vmess.json" "$XRAY_CONFIG_DIR/vmess.json"
+    cp "$INSTALL_DIR/config/vless.json" "$XRAY_CONFIG_DIR/vless.json"
+    cp "$INSTALL_DIR/config/trojan.json" "$XRAY_CONFIG_DIR/trojan.json"
+    
+    # Set proper permissions
+    chmod 644 "$XRAY_CONFIG_DIR"/*.json
+    chown root:root "$XRAY_CONFIG_DIR"/*.json
+    
+    # Install systemd service files
+    echo "Installing systemd service files..."
+    cp "$INSTALL_DIR/systemd/xray-vmess.service" "/etc/systemd/system/"
+    cp "$INSTALL_DIR/systemd/xray-vless.service" "/etc/systemd/system/"
+    cp "$INSTALL_DIR/systemd/xray-trojan.service" "/etc/systemd/system/"
+    
+    # Set proper permissions for service files
+    chmod 644 /etc/systemd/system/xray-*.service
+    
+    # Reload systemd and enable services
+    systemctl daemon-reload
+    
+    # Enable services (but don't start them yet)
+    systemctl enable xray-vmess.service
+    systemctl enable xray-vless.service  
+    systemctl enable xray-trojan.service
+    
+    echo "Xray-core services configured successfully"
+}
+
+# Setup nginx
+setup_nginx() {
+    echo "Setting Up Nginx..."
+    
+    # Install nginx if not present
+    if ! command -v nginx >/dev/null 2>&1; then
+        echo "Installing Nginx..."
+        apt-get update
+        apt-get install -y nginx
+    fi
+    
+    # Backup default nginx config
+    if [[ -f /etc/nginx/sites-available/default ]]; then
+        mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup
+    fi
+    
+    # Install our nginx configuration
+    cp "$INSTALL_DIR/config/nginx.conf" /etc/nginx/sites-available/default
+    
+    # Test nginx configuration
+    if nginx -t; then
+        echo "Nginx configuration is valid"
     else
-        echo -e "${RED}Error: Xray setup script not found${NC}"
+        echo "Error: Nginx configuration is invalid"
+        # Restore backup
+        if [[ -f /etc/nginx/sites-available/default.backup ]]; then
+            mv /etc/nginx/sites-available/default.backup /etc/nginx/sites-available/default
+        fi
         exit 1
     fi
+    
+    # Enable and start nginx
+    systemctl enable nginx
+    systemctl restart nginx
+    
+    echo "Nginx configured successfully"
+}
+
+# Generate SSL certificates
+generate_ssl_certificates() {
+    echo "Generating SSL Certificates..."
+    
+    local cert_dir="$XRAY_CONFIG_DIR"
+    local cert_file="$cert_dir/xray.crt"
+    local key_file="$cert_dir/xray.key"
+    
+    # Get server IP address
+    local server_ip
+    server_ip=$(curl -s --connect-timeout 10 --max-time 15 "https://ipv4.icanhazip.com" 2>/dev/null || echo "127.0.0.1")
+    
+    if [[ -z "$server_ip" ]]; then
+        echo "Could not get public IP, using localhost"
+        server_ip="127.0.0.1"
+    fi
+    
+    # Generate private key
+    echo "Generating private key..."
+    if openssl genrsa -out "$key_file" 2048 >/dev/null 2>&1; then
+        chmod 600 "$key_file"
+        echo "Private key generated"
+    else
+        echo "Error: Failed to generate private key"
+        return 1
+    fi
+    
+    # Generate certificate
+    echo "Generating certificate..."
+    cat > /tmp/xray_cert.conf << EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = US
+ST = CA
+L = San Francisco
+O = Modern Tunneling
+OU = Autoscript
+CN = ${server_ip}
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = ${server_ip}
+IP.1 = ${server_ip}
+IP.2 = 127.0.0.1
+EOF
+    
+    if openssl req -new -x509 -key "$key_file" -out "$cert_file" -days 3650 \
+        -config /tmp/xray_cert.conf -extensions v3_req >/dev/null 2>&1; then
+        chmod 644 "$cert_file"
+        rm -f /tmp/xray_cert.conf
+        echo "Certificate generated (valid for 10 years)"
+    else
+        echo "Error: Failed to generate certificate"
+        rm -f /tmp/xray_cert.conf
+        return 1
+    fi
+    
+    return 0
 }
 
 # Setup firewall
 setup_firewall() {
-    echo -e "\n${BLUE}Configuring Firewall...${NC}"
+    echo "Configuring Firewall..."
     
     if [[ -f "$INSTALL_DIR/scripts/system/firewall.sh" ]]; then
         echo "Running firewall configuration script..."
-        bash "$INSTALL_DIR/scripts/system/firewall.sh" || echo -e "${YELLOW}Warning: Firewall configuration had issues${NC}"
+        bash "$INSTALL_DIR/scripts/system/firewall.sh" || echo "Warning: Firewall configuration had issues"
     else
         echo "Installing and configuring UFW firewall manually..."
         
         # Install UFW if not present
-        if ! command -v ufw &> /dev/null; then
+        if ! command -v ufw >/dev/null 2>&1; then
             apt-get install -y ufw
         fi
         
@@ -398,628 +497,240 @@ setup_firewall() {
         ufw default allow outgoing
         
         # Allow SSH ports
-        ufw allow 22/tcp comment "SSH"
-        ufw allow 109/tcp comment "Dropbear SSH"
-        ufw allow 143/tcp comment "Dropbear WebSocket"
+        ufw allow 22/tcp
+        ufw allow 2222/tcp
+        
+        # Allow HTTP/HTTPS
+        ufw allow 80/tcp
+        ufw allow 443/tcp
+        ufw allow 8443/tcp
         
         # Allow Xray ports
-        ufw allow 8080/tcp comment "Xray VMess TCP"
-        ufw allow 8081/tcp comment "Xray VLESS TCP"
-        ufw allow 443/tcp comment "Xray TLS"
-        ufw allow 8443/tcp comment "Xray Trojan TCP"
-        
-        # Allow WebSocket port
-        ufw allow 8880/tcp comment "SSH WebSocket"
+        ufw allow 55/tcp
+        ufw allow 58/tcp
         
         # Enable UFW
         ufw --force enable
     fi
     
-    echo -e "${GREEN}✓ Firewall configured and enabled${NC}"
+    echo "Firewall configured successfully"
 }
 
-# Create management commands
-create_management_commands() {
-    echo -e "\n${BLUE}Creating Management Commands...${NC}"
+# Run system optimization
+run_system_optimization() {
+    echo "Running System Optimization..."
     
-    # Create main menu script
-    cat > "$BIN_DIR/autoscript" << 'EOF'
+    if [[ -f "$INSTALL_DIR/scripts/system/optimize.sh" ]]; then
+        echo "Running system optimization script..."
+        bash "$INSTALL_DIR/scripts/system/optimize.sh" || echo "Warning: System optimization had some issues"
+        echo "System optimization completed"
+    else
+        echo "Error: System optimization script not found"
+        exit 1
+    fi
+}
+
+# Start services
+start_services() {
+    echo "Starting Services..."
+    
+    # Start Xray services
+    echo "Starting Xray services..."
+    systemctl start xray-vmess.service
+    systemctl start xray-vless.service
+    systemctl start xray-trojan.service
+    
+    # Wait for services to be ready
+    sleep 3
+    
+    # Check service status
+    local failed_services=()
+    for service in xray-vmess xray-vless xray-trojan nginx; do
+        if systemctl is-active --quiet "$service"; then
+            echo "Service $service is running"
+        else
+            echo "Warning: Service $service failed to start"
+            failed_services+=("$service")
+        fi
+    done
+    
+    if [[ ${#failed_services[@]} -gt 0 ]]; then
+        echo "Some services failed to start. Please check manually:"
+        for service in "${failed_services[@]}"; do
+            echo "  systemctl status $service"
+        done
+    else
+        echo "All services started successfully"
+    fi
+}
+
+# Create management scripts
+create_management_scripts() {
+    echo "Creating management scripts..."
+    
+    # Create Xray management script
+    cat > "$BIN_DIR/xray-mgmt" << 'EOF'
 #!/bin/bash
 
-# Modern Tunneling Autoscript - Main Menu
-# Quick access to all autoscript functions
-
-INSTALL_DIR="/opt/autoscript"
-
-# Colors
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly CYAN='\033[0;36m'
-readonly WHITE='\033[1;37m'
-readonly NC='\033[0m'
-
-show_banner() {
-    clear
-    echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════╗"
-    echo "║               Modern Tunneling Autoscript               ║"
-    echo "║                   Management Panel                      ║"
-    echo "╚══════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-}
-
-show_menu() {
-    echo -e "${WHITE}Main Menu:${NC}"
-    echo ""
-    echo "  ${GREEN}1.${NC} SSH Account Management"
-    echo "  ${GREEN}2.${NC} Xray Account Management" 
-    echo "  ${GREEN}3.${NC} Service Management"
-    echo "  ${GREEN}4.${NC} System Information"
-    echo "  ${GREEN}5.${NC} View Logs"
-    echo "  ${GREEN}6.${NC} Update System"
-    echo "  ${GREEN}7.${NC} Backup & Restore"
-    echo "  ${GREEN}0.${NC} Exit"
-    echo ""
-}
-
-ssh_menu() {
-    while true; do
-        clear
-        show_banner
-        echo -e "${WHITE}SSH Account Management:${NC}"
+case "$1" in
+    start)
+        systemctl start xray-vmess xray-vless xray-trojan
+        echo "Xray services started"
+        ;;
+    stop)
+        systemctl stop xray-vmess xray-vless xray-trojan
+        echo "Xray services stopped"
+        ;;
+    restart)
+        systemctl restart xray-vmess xray-vless xray-trojan
+        echo "Xray services restarted"
+        ;;
+    status)
+        echo "VMess Service:"
+        systemctl status xray-vmess --no-pager -l
         echo ""
-        echo "  ${GREEN}1.${NC} Add SSH Account"
-        echo "  ${GREEN}2.${NC} Delete SSH Account"
-        echo "  ${GREEN}3.${NC} List SSH Accounts"
-        echo "  ${GREEN}4.${NC} Show Account Details"
-        echo "  ${GREEN}5.${NC} Extend Account"
-        echo "  ${GREEN}6.${NC} Change Password"
-        echo "  ${GREEN}7.${NC} Cleanup Expired"
-        echo "  ${GREEN}0.${NC} Back to Main Menu"
+        echo "VLESS Service:"
+        systemctl status xray-vless --no-pager -l  
         echo ""
-        read -p "Select option [0-7]: " choice
-        
-        case $choice in
-            1)
-                read -p "Enter username: " username
-                read -p "Enter validity days (default 30): " days
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" add "$username" "" "${days:-30}"
-                read -p "Press Enter to continue..."
-                ;;
-            2)
-                read -p "Enter username to delete: " username
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" delete "$username"
-                read -p "Press Enter to continue..."
-                ;;
-            3)
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" list
-                read -p "Press Enter to continue..."
-                ;;
-            4)
-                read -p "Enter username: " username
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" show "$username"
-                read -p "Press Enter to continue..."
-                ;;
-            5)
-                read -p "Enter username: " username
-                read -p "Enter additional days: " days
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" extend "$username" "$days"
-                read -p "Press Enter to continue..."
-                ;;
-            6)
-                read -p "Enter username: " username
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" password "$username"
-                read -p "Press Enter to continue..."
-                ;;
-            7)
-                bash "$INSTALL_DIR/scripts/accounts/ssh-account.sh" cleanup
-                read -p "Press Enter to continue..."
-                ;;
-            0)
-                break
-                ;;
-            *)
-                echo "Invalid option"
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-xray_menu() {
-    while true; do
-        clear
-        show_banner
-        echo -e "${WHITE}Xray Account Management:${NC}"
-        echo ""
-        echo "  ${GREEN}1.${NC} Add VMess Account"
-        echo "  ${GREEN}2.${NC} Add VLESS Account"
-        echo "  ${GREEN}3.${NC} Add Trojan Account"
-        echo "  ${GREEN}4.${NC} List All Clients"
-        echo "  ${GREEN}5.${NC} Remove Client"
-        echo "  ${GREEN}6.${NC} Generate Config"
-        echo "  ${GREEN}0.${NC} Back to Main Menu"
-        echo ""
-        read -p "Select option [0-6]: " choice
-        
-        case $choice in
-            1)
-                read -p "Enter username: " username
-                /usr/local/bin/xray-client add vmess "$username" 2>/dev/null || echo "Xray client manager not found"
-                read -p "Press Enter to continue..."
-                ;;
-            2)
-                read -p "Enter username: " username
-                /usr/local/bin/xray-client add vless "$username" 2>/dev/null || echo "Xray client manager not found"
-                read -p "Press Enter to continue..."
-                ;;
-            3)
-                read -p "Enter username: " username
-                /usr/local/bin/xray-client add trojan "$username" 2>/dev/null || echo "Xray client manager not found"
-                read -p "Press Enter to continue..."
-                ;;
-            4)
-                /usr/local/bin/xray-client list 2>/dev/null || echo "Xray client manager not found"
-                read -p "Press Enter to continue..."
-                ;;
-            5)
-                read -p "Enter username to remove: " username
-                /usr/local/bin/xray-client remove "$username" 2>/dev/null || echo "Xray client manager not found"
-                read -p "Press Enter to continue..."
-                ;;
-            6)
-                read -p "Enter username: " username
-                server_ip=$(curl -s4 ifconfig.me 2>/dev/null || echo "Unable to get IP")
-                /usr/local/bin/xray-client config "$username" "$server_ip" 2>/dev/null || echo "Xray client manager not found"
-                read -p "Press Enter to continue..."
-                ;;
-            0)
-                break
-                ;;
-            *)
-                echo "Invalid option"
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-show_system_info() {
-    clear
-    show_banner
-    echo -e "${WHITE}System Information:${NC}"
-    echo ""
-    
-    # System details
-    echo -e "${CYAN}System:${NC}"
-    echo "OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)"
-    echo "Kernel: $(uname -r)"
-    echo "Uptime: $(uptime -p)"
-    echo ""
-    
-    # Resource usage
-    echo -e "${CYAN}Resources:${NC}"
-    echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | awk -F'%' '{print $1}')%"
-    echo "Memory Usage: $(free | grep Mem | awk '{printf "%.1f%%", $3/$2 * 100.0}')"
-    echo "Disk Usage: $(df -h / | awk 'NR==2{printf "%s", $5}')"
-    echo ""
-    
-    # Network
-    echo -e "${CYAN}Network:${NC}"
-    echo "Public IP: $(curl -s4 ifconfig.me 2>/dev/null || echo 'Unable to get IP')"
-    echo ""
-    
-    # Services
-    echo -e "${CYAN}Service Status:${NC}"
-    for service in ssh dropbear xray; do
-        if systemctl is-active --quiet $service 2>/dev/null; then
-            echo -e "$service: ${GREEN}Running${NC}"
-        else
-            echo -e "$service: ${RED}Stopped${NC}"
-        fi
-    done
-    
-    read -p "Press Enter to continue..."
-}
-
-main_loop() {
-    while true; do
-        show_banner
-        show_menu
-        read -p "Select option [0-7]: " choice
-        
-        case $choice in
-            1) ssh_menu ;;
-            2) xray_menu ;;
-            3) 
-                echo "Service management features:"
-                echo "- Restart SSH: systemctl restart ssh"
-                echo "- Restart Dropbear: systemctl restart dropbear"
-                echo "- Restart Xray: systemctl restart xray"
-                echo "- Check Status: systemctl status [service]"
-                read -p "Press Enter to continue..."
-                ;;
-            4) show_system_info ;;
-            5)
-                echo "Log locations:"
-                echo "- Main log: /var/log/autoscript/autoscript.log"
-                echo "- Error log: /var/log/autoscript/error.log"
-                echo "- Access log: /var/log/autoscript/access.log"
-                echo "- Xray logs: /var/log/xray/"
-                echo ""
-                echo "View logs with: tail -f /var/log/autoscript/autoscript.log"
-                read -p "Press Enter to continue..."
-                ;;
-            6)
-                echo "Updating system packages..."
-                apt update && apt upgrade -y
-                echo "System updated!"
-                read -p "Press Enter to continue..."
-                ;;
-            7)
-                echo "Backup & restore features:"
-                echo "- Configuration backup: tar -czf autoscript-backup.tar.gz /opt/autoscript /etc/autoscript"
-                echo "- Account backup: cp /etc/autoscript/accounts/* /backup/"
-                echo "- Restore: Extract backup and restart services"
-                read -p "Press Enter to continue..."
-                ;;
-            0)
-                echo -e "${GREEN}Thank you for using Modern Tunneling Autoscript!${NC}"
-                exit 0
-                ;;
-            *)
-                echo "Invalid option"
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-# Check if running as root
-if [[ $EUID -ne 0 ]]; then
-    echo -e "${RED}Error: This script must be run as root${NC}"
-    exit 1
-fi
-
-main_loop
-EOF
-    
-    chmod +x "$BIN_DIR/autoscript"
-    
-    # Create symbolic links for account management
-    if [[ -f "$INSTALL_DIR/scripts/accounts/ssh-account.sh" ]]; then
-        ln -sf "$INSTALL_DIR/scripts/accounts/ssh-account.sh" "$BIN_DIR/ssh-account"
-    fi
-    
-    echo -e "${GREEN}✓ Management commands created${NC}"
-    echo "Main menu: autoscript"
-    echo "SSH accounts: ssh-account"
-    echo "Xray clients: xray-client (if Xray is installed)"
-}
-
-# Setup cron jobs for maintenance
-setup_cron_jobs() {
-    echo -e "\n${BLUE}Setting Up Maintenance Tasks...${NC}"
-    
-    # Create cron job for account cleanup
-    cat > /tmp/autoscript_cron << EOF
-# Modern Tunneling Autoscript - Maintenance Jobs
-# Clean expired accounts every hour
-0 * * * * /opt/autoscript/scripts/accounts/ssh-account.sh cleanup >/dev/null 2>&1
-
-# Clean logs every 6 hours
-0 */6 * * * find /var/log -name "*.log" -size +100M -exec truncate -s 50M {} \;
-
-# Restart services daily at 3 AM
-0 3 * * * systemctl restart ssh dropbear xray >/dev/null 2>&1
-EOF
-    
-    # Install cron jobs
-    crontab /tmp/autoscript_cron
-    rm /tmp/autoscript_cron
-    
-    echo -e "${GREEN}✓ Maintenance tasks scheduled${NC}"
-}
-
-# Final verification
-verify_installation() {
-    echo -e "\n${BLUE}Verifying Installation...${NC}"
-    
-    local verification_failed=false
-    
-    # Check essential files
-    local essential_files=(
-        "$INSTALL_DIR/utils/common.sh"
-        "$INSTALL_DIR/config/system.conf"
-        "$BIN_DIR/autoscript"
-    )
-    
-    for file in "${essential_files[@]}"; do
-        if [[ -f "$file" ]]; then
-            echo -e "${GREEN}✓ $file${NC}"
-        else
-            echo -e "${RED}✗ $file${NC}"
-            verification_failed=true
-        fi
-    done
-    
-    # Check services
-    local services=("ssh" "cron")
-    
-    for service in "${services[@]}"; do
-        if systemctl is-active --quiet "$service"; then
-            echo -e "${GREEN}✓ $service service${NC}"
-        else
-            echo -e "${RED}✗ $service service${NC}"
-            verification_failed=true
-        fi
-    done
-    
-    # Check commands
-    local commands=("autoscript")
-    
-    for cmd in "${commands[@]}"; do
-        if command -v "$cmd" &> /dev/null; then
-            echo -e "${GREEN}✓ $cmd command${NC}"
-        else
-            echo -e "${RED}✗ $cmd command${NC}"
-            verification_failed=true
-        fi
-    done
-    
-    if [[ "$verification_failed" == "true" ]]; then
-        echo -e "${RED}Installation verification failed${NC}"
+        echo "Trojan Service:"
+        systemctl status xray-trojan --no-pager -l
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
         exit 1
-    else
-        echo -e "${GREEN}Installation verification passed${NC}"
-    fi
-}
-
-# Show installation summary
-show_installation_summary() {
-    clear
-    print_banner
+        ;;
+esac
+EOF
     
-    echo -e "${GREEN}"
-    echo "╔══════════════════════════════════════════════════════════╗"
-    echo "║              INSTALLATION COMPLETED SUCCESSFULLY         ║"
-    echo "╚══════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
+    chmod +x "$BIN_DIR/xray-mgmt"
     
-    echo -e "${CYAN}Installed Services:${NC}"
-    echo "✓ SSH Server (Port 22)"
-    echo "✓ Dropbear SSH (Port 109)"
-    echo "✓ Dropbear WebSocket (Port 143)"
-    echo "✓ Xray-core with VMess/VLESS/Trojan"
-    echo "✓ WebSocket Tunneling (Port 8880)"
-    echo "✓ System Optimization Applied"
-    echo "✓ Firewall Configured"
-    echo "✓ Account Management System"
-    
-    echo -e "\n${CYAN}Management Commands:${NC}"
-    echo "• Main menu: ${WHITE}autoscript${NC}"
-    echo "• SSH accounts: ${WHITE}ssh-account${NC}"
-    echo "• Xray clients: ${WHITE}xray-client${NC} (if available)"
-    
-    echo -e "\n${CYAN}Quick Start:${NC}"
-    echo "1. Run ${WHITE}autoscript${NC} to access the main menu"
-    echo "2. Create SSH account: ${WHITE}ssh-account add username${NC}"
-    echo "3. Create Xray client: ${WHITE}xray-client add vmess username${NC}"
-    
-    local server_ip=$(curl -s4 ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
-    
-    echo -e "\n${CYAN}Server Information:${NC}"
-    echo "Server IP: ${WHITE}$server_ip${NC}"
-    echo "SSH Port: ${WHITE}22${NC}"
-    echo "Dropbear Port: ${WHITE}109${NC}"
-    echo "Dropbear WS Port: ${WHITE}143${NC}"
-    echo "WebSocket Port: ${WHITE}8880${NC}"
-    
-    echo -e "\n${CYAN}Installation Method:${NC}"
-    echo "✓ Downloaded from GitHub via curl"
-    echo "✓ One-command installation"
-    echo "✓ Remote installation capability"
-    
-    echo -e "\n${CYAN}Important Notes:${NC}"
-    echo "• All services are secured with fail2ban"
-    echo "• System optimizations are applied"
-    echo "• Automatic maintenance tasks are scheduled"
-    echo "• Logs are located in /var/log/autoscript/"
-    
-    echo -e "\n${GREEN}Installation completed successfully!${NC}"
-    echo -e "Repository: ${REPO_URL}"
-    echo ""
-}
-
-# Global variables for installation mode
-FORCE_INSTALL=false
-AUTO_YES=false
-INTERACTIVE_MODE=true
-
-# Parse command line arguments
-parse_args() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --force|-f)
-                FORCE_INSTALL=true
-                shift
-                ;;
-            --yes|-y)
-                AUTO_YES=true
-                shift
-                ;;
-            --non-interactive)
-                INTERACTIVE_MODE=false
-                AUTO_YES=true
-                shift
-                ;;
-            --help|-h)
-                show_help
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}Error: Unknown option: $1${NC}"
-                show_help
-                exit 1
-                ;;
-        esac
-    done
-}
-
-# Show help information
-show_help() {
-    echo "Modern Tunneling Autoscript - Installation Options"
-    echo ""
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  --force, -f           Force reinstallation even if already installed"
-    echo "  --yes, -y             Automatically answer yes to all prompts"
-    echo "  --non-interactive     Run in completely non-interactive mode"
-    echo "  --help, -h            Show this help message"
-    echo ""
-    echo "Examples:"
-    echo "  $0                    # Interactive installation"
-    echo "  $0 --yes             # Auto-confirm all prompts"
-    echo "  $0 --force --yes     # Force reinstall with auto-confirm"
-    echo "  curl -sSL url | bash -s -- --non-interactive"
-}
-
-# Enhanced user prompt with timeout and auto-answer
-prompt_user() {
-    local message="$1"
-    local default="${2:-N}"
-    local timeout="${3:-30}"
-    
-    # Non-interactive mode or auto-yes
-    if [[ "$INTERACTIVE_MODE" == "false" ]] || [[ "$AUTO_YES" == "true" ]]; then
-        if [[ "$default" =~ ^[Yy]$ ]]; then
-            echo "y"
-            return 0
-        else
-            echo "n"
-            return 1
-        fi
+    # Install Xray client management script
+    if [[ -f "$INSTALL_DIR/scripts/xray-client.sh" ]]; then
+        cp "$INSTALL_DIR/scripts/xray-client.sh" "$BIN_DIR/xray-client"
+        chmod +x "$BIN_DIR/xray-client"
+        echo "Xray client management script installed"
     fi
     
-    # Interactive mode with timeout
-    if [[ -t 0 ]]; then
-        local reply
-        if timeout "$timeout" bash -c "read -p '$message' -n 1 -r reply; echo \$reply" 2>/dev/null; then
-            echo
-            if [[ $reply =~ ^[Yy]$ ]]; then
-                return 0
+    # Create general autoscript management script
+    cat > "$BIN_DIR/autoscript-mgmt" << 'EOF'
+#!/bin/bash
+
+case "$1" in
+    start)
+        systemctl start ssh dropbear xray-vmess xray-vless xray-trojan nginx
+        echo "All services started"
+        ;;
+    stop)
+        systemctl stop ssh dropbear xray-vmess xray-vless xray-trojan nginx
+        echo "All services stopped"
+        ;;
+    restart)
+        systemctl restart ssh dropbear xray-vmess xray-vless xray-trojan nginx
+        echo "All services restarted"
+        ;;
+    status)
+        echo "=== Service Status ==="
+        for service in ssh dropbear xray-vmess xray-vless xray-trojan nginx; do
+            if systemctl is-active --quiet "$service"; then
+                echo "$service: RUNNING"
             else
-                return 1
+                echo "$service: STOPPED"
             fi
-        else
-            echo
-            echo -e "${YELLOW}Warning: Timeout reached, using default answer: $default${NC}"
-            if [[ "$default" =~ ^[Yy]$ ]]; then
-                return 0
-            else
-                return 1
-            fi
-        fi
-    else
-        # Running via pipe - use default
-        echo -e "${YELLOW}Warning: Non-interactive mode detected, using default: $default${NC}"
-        if [[ "$default" =~ ^[Yy]$ ]]; then
-            return 0
-        else
-            return 1
-        fi
-    fi
+        done
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+EOF
+    
+    chmod +x "$BIN_DIR/autoscript-mgmt"
+    
+    echo "Management scripts created successfully"
+}
+
+# Display installation summary
+display_summary() {
+    echo ""
+    echo "=============================================================="
+    echo "                  INSTALLATION COMPLETED"
+    echo "=============================================================="
+    echo ""
+    echo "Autoscript Tunneling v3.0.0 has been installed successfully!"
+    echo ""
+    echo "Services installed:"
+    echo "  • SSH (port 22)"
+    echo "  • Dropbear SSH (port 2222)"
+    echo "  • Xray VMess (WebSocket: port 55, gRPC: port 1054, TCP: port 1055)"
+    echo "  • Xray VLESS (WebSocket: port 58, gRPC: port 1057, TCP: port 1058)"
+    echo "  • Xray Trojan (WebSocket: port 1060, gRPC: port 1061, TCP: port 1059)"
+    echo "  • Nginx (HTTP: port 80, HTTPS: port 443, gRPC: port 8443)"
+    echo ""
+    echo "Management commands:"
+    echo "  • autoscript-mgmt {start|stop|restart|status}"
+    echo "  • xray-mgmt {start|stop|restart|status}"
+    echo "  • xray-client {add|remove|list|config} - Manage Xray clients"
+    echo ""
+    echo "Configuration files:"
+    echo "  • Xray configs: /etc/xray/"
+    echo "  • Nginx config: /etc/nginx/sites-available/default"
+    echo "  • SSL certificates: /etc/xray/xray.{crt,key}"
+    echo ""
+    echo "Log files:"
+    echo "  • System logs: /var/log/autoscript/"
+    echo "  • Xray logs: /var/log/xray/"
+    echo ""
+    echo "=============================================================="
 }
 
 # Main installation function
 main() {
-    # Parse command line arguments first
-    parse_args "$@"
-    
-    # Detect if running via pipe and adjust settings
-    if [[ ! -t 0 ]]; then
-        INTERACTIVE_MODE=false
-        AUTO_YES=true
-        echo -e "${YELLOW}Warning: Pipe input detected - enabling non-interactive mode${NC}"
-    fi
-    
-    # Check if already installed
-    if [[ -f "$INSTALL_DIR/utils/common.sh" ]]; then
-        echo -e "${YELLOW}Warning: Autoscript appears to be already installed${NC}"
-        
-        if [[ "$FORCE_INSTALL" == "true" ]]; then
-            echo -e "${YELLOW}Warning: Force installation enabled, proceeding with reinstallation...${NC}"
-        elif prompt_user "Do you want to reinstall? (y/N): " "N" 15; then
-            echo -e "${YELLOW}Proceeding with reinstallation...${NC}"
-        else
-            echo "Installation cancelled"
-            exit 0
-        fi
-    fi
-    
     print_banner
     
-    echo -e "${CYAN}Starting Modern Tunneling Autoscript installation...${NC}"
-    echo "Repository: $REPO_URL"
-    echo "This will install and configure tunneling services on your server"
-    echo ""
+    echo "Starting installation process..."
     
-    # Ask for installation confirmation
-    if [[ "$AUTO_YES" != "true" ]]; then
-        read -p "Do you want to continue with the installation? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "Installation cancelled"
-            exit 0
-        fi
-    else
-        echo "Auto-confirmation enabled, proceeding with installation..."
-    fi
-    
-    echo ""
-    echo "Installation started..."
-    
-    # Run installation steps
+    # Pre-installation checks
     check_system_compatibility
     check_internet
+    test_github_connectivity
     
-    # Test GitHub connectivity before proceeding
-    if ! test_github_connectivity; then
-        echo -e "${RED}Error: Cannot proceed without GitHub access${NC}"
-        exit 1
-    fi
-    
-    install_basic_dependencies
+    # Create directory structure
     create_directory_structure
+    
+    # Download files
     download_autoscript_files
+    
+    # Source utilities after download
+    source_utilities
+    
+    # Install dependencies
     install_dependencies
-    run_system_optimization
+    
+    # Setup services
     setup_ssh_services
     setup_xray_services
+    setup_nginx
+    
+    # Generate SSL certificates
+    generate_ssl_certificates
+    
+    # Configure firewall
     setup_firewall
-    create_management_commands
-    setup_cron_jobs
-    verify_installation
     
-    # Show summary
-    show_installation_summary
+    # Run system optimization
+    run_system_optimization
     
-    # Ask to restart system
-    echo ""
-    read -p "Do you want to restart the system now? (recommended) (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "System will restart in 5 seconds..."
-        sleep 5
-        reboot
-    else
-        echo ""
-        echo "Installation completed! Please restart the system manually when convenient."
-        echo "You can run 'autoscript' command to access the management panel."
-    fi
+    # Create management scripts
+    create_management_scripts
+    
+    # Start services
+    start_services
+    
+    # Display summary
+    display_summary
+    
+    echo "Installation completed successfully!"
 }
 
 # Run main function

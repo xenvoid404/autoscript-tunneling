@@ -3,16 +3,6 @@
 # Common utility functions for autoscript tunneling
 # Compatible with Debian 11+ and Ubuntu 22.04+
 
-# Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly PURPLE='\033[0;35m'
-readonly CYAN='\033[0;36m'
-readonly WHITE='\033[1;37m'
-readonly NC='\033[0m' # No Color
-
 # System information
 get_system_info() {
     if [[ -f /etc/os-release ]]; then
@@ -21,7 +11,7 @@ get_system_info() {
         VER=$VERSION_ID
         CODENAME=$VERSION_CODENAME
     else
-        echo -e "${RED}Error: Cannot detect OS information${NC}"
+        echo "Error: Cannot detect OS information"
         exit 1
     fi
 }
@@ -29,7 +19,7 @@ get_system_info() {
 # Check if running as root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        echo -e "${RED}Error: This script must be run as root${NC}"
+        echo "Error: This script must be run as root"
         exit 1
     fi
 }
@@ -88,106 +78,55 @@ check_compatibility() {
     case $OS in
         "Ubuntu")
             if ! version_compare "$VER" ">=" "22.04"; then
-                echo -e "${RED}Error: Ubuntu 22.04+ required. Current: $VER${NC}"
+                echo "Error: Ubuntu 22.04+ required. Current: $VER"
                 exit 1
             fi
             ;;
         "Debian GNU/Linux")
             if ! version_compare "$VER" ">=" "11"; then
-                echo -e "${RED}Error: Debian 11+ required. Current: $VER${NC}"
+                echo "Error: Debian 11+ required. Current: $VER"
                 exit 1
             fi
             ;;
         *)
-            echo -e "${RED}Error: Unsupported OS: $OS${NC}"
+            echo "Error: Unsupported OS: $OS"
+            echo "Supported: Ubuntu 22.04+ or Debian 11+"
             exit 1
             ;;
     esac
     
-    echo -e "${GREEN}✓ OS compatibility check passed: $OS $VER${NC}"
+    echo "System compatibility check passed: $OS $VER"
 }
 
-# Print banner
-print_banner() {
-    echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════╗"
-    echo "║                Modern Tunneling Autoscript              ║"
-    echo "║                   Production Ready                      ║"
-    echo "╚══════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-}
-
-# Print section header
-print_section() {
-    local title="$1"
-    echo -e "\n${BLUE}[INFO]${NC} ${WHITE}$title${NC}"
-    echo -e "${BLUE}$(printf '%.0s=' {1..60})${NC}"
-}
-
-# Print success message
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-# Print error message
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Print warning message
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-# Print info message
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-# Generate random string
-generate_random_string() {
-    local length=${1:-12}
-    tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c $length
-}
-
-# Generate UUID
-generate_uuid() {
-    if command -v uuidgen &> /dev/null; then
-        uuidgen
-    else
-        # Fallback UUID generation
-        cat /proc/sys/kernel/random/uuid
-    fi
-}
-
-# Check if port is available
-check_port() {
-    local port=$1
-    if netstat -tuln | grep -q ":$port "; then
-        return 1
-    else
-        return 0
-    fi
-}
-
-# Wait for service to be ready
-wait_for_service() {
-    local service_name="$1"
-    local max_attempts=30
-    local attempt=0
+# Get public IP address
+get_public_ip() {
+    local ip=""
     
-    while [[ $attempt -lt $max_attempts ]]; do
-        if systemctl is-active --quiet "$service_name"; then
-            print_success "Service $service_name is ready"
-            return 0
+    # Try multiple IP detection services
+    local services=(
+        "https://ipv4.icanhazip.com"
+        "https://api.ipify.org"
+        "https://checkip.amazonaws.com"
+        "https://ipinfo.io/ip"
+    )
+    
+    for service in "${services[@]}"; do
+        if ip=$(curl -s --connect-timeout 10 --max-time 15 "$service" 2>/dev/null); then
+            # Validate IP format
+            if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+                echo "$ip"
+                return 0
+            fi
         fi
-        
-        print_info "Waiting for $service_name to start... ($((attempt + 1))/$max_attempts)"
-        sleep 2
-        ((attempt++))
     done
     
-    print_error "Service $service_name failed to start within timeout"
+    # Fallback to local IP detection
+    ip=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7; exit}')
+    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        echo "$ip"
+        return 0
+    fi
+    
     return 1
 }
 
@@ -196,179 +135,154 @@ create_directory() {
     local dir_path="$1"
     local permissions="${2:-755}"
     
-    if [[ ! -d "$dir_path" ]]; then
-        mkdir -p "$dir_path"
+    if mkdir -p "$dir_path" 2>/dev/null; then
         chmod "$permissions" "$dir_path"
-        print_info "Created directory: $dir_path"
-    fi
-}
-
-# Backup file
-backup_file() {
-    local file_path="$1"
-    if [[ -f "$file_path" ]]; then
-        cp "$file_path" "${file_path}.backup.$(date +%Y%m%d_%H%M%S)"
-        print_info "Backed up: $file_path"
-    fi
-}
-
-# Download file with retry
-download_file() {
-    local url="$1"
-    local destination="$2"
-    local max_attempts=3
-    local attempt=0
-    
-    while [[ $attempt -lt $max_attempts ]]; do
-        if wget -q --show-progress -O "$destination" "$url"; then
-            print_success "Downloaded: $url"
-            return 0
-        fi
-        
-        print_warning "Download attempt $((attempt + 1)) failed for: $url"
-        ((attempt++))
-        sleep 2
-    done
-    
-    print_error "Failed to download after $max_attempts attempts: $url"
-    return 1
-}
-
-# Check internet connectivity
-check_internet() {
-    if ping -c 1 8.8.8.8 &> /dev/null; then
         return 0
     else
-        print_error "No internet connectivity detected"
-        return 1
-    fi
-}
-
-# Get public IP
-get_public_ip() {
-    local ip
-    ip=$(curl -s4 ifconfig.me 2>/dev/null || curl -s4 icanhazip.com 2>/dev/null || curl -s4 ipinfo.io/ip 2>/dev/null)
-    
-    if [[ -n "$ip" ]]; then
-        echo "$ip"
-    else
-        print_error "Failed to get public IP"
-        return 1
-    fi
-}
-
-# Validate IP address
-validate_ip() {
-    local ip="$1"
-    local regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-    
-    if [[ $ip =~ $regex ]]; then
-        for octet in $(echo "$ip" | tr '.' ' '); do
-            if [[ $octet -gt 255 ]]; then
-                return 1
-            fi
-        done
-        return 0
-    else
+        echo "Error: Failed to create directory: $dir_path"
         return 1
     fi
 }
 
 # Check if command exists
 command_exists() {
-    command -v "$1" &> /dev/null
+    command -v "$1" >/dev/null 2>&1
 }
 
-# Install package if not exists
-install_package() {
-    local package="$1"
-    
-    if ! dpkg -l | grep -q "^ii  $package "; then
-        print_info "Installing package: $package"
-        if apt-get update &> /dev/null && apt-get install -y "$package" &> /dev/null; then
-            print_success "Installed: $package"
-        else
-            print_error "Failed to install: $package"
-            return 1
-        fi
+# Check if port is available
+is_port_available() {
+    local port="$1"
+    ! ss -tuln | grep -q ":$port "
+}
+
+# Generate random string
+generate_random_string() {
+    local length="${1:-32}"
+    tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length"
+}
+
+# Generate UUID
+generate_uuid() {
+    if command_exists uuidgen; then
+        uuidgen
     else
-        print_info "Package already installed: $package"
+        # Fallback UUID generation
+        local uuid=""
+        for i in {1..32}; do
+            case $i in
+                9|14|19|24) uuid+="-" ;;
+            esac
+            uuid+=$(printf "%x" $((RANDOM % 16)))
+        done
+        echo "$uuid"
     fi
 }
 
-# Enable and start service
-enable_service() {
+# Validate IP address
+validate_ip() {
+    local ip="$1"
+    [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]
+}
+
+# Validate port number
+validate_port() {
+    local port="$1"
+    [[ $port =~ ^[0-9]+$ ]] && [[ $port -ge 1 ]] && [[ $port -le 65535 ]]
+}
+
+# Download file with retry
+download_file() {
+    local url="$1"
+    local destination="$2"
+    local max_attempts="${3:-3}"
+    local attempt=0
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        ((attempt++))
+        echo "Downloading $(basename "$destination") (attempt $attempt/$max_attempts)..."
+        
+        if wget -q --show-progress --timeout=30 --tries=2 -O "$destination" "$url"; then
+            echo "Downloaded: $(basename "$destination")"
+            return 0
+        else
+            echo "Download attempt $attempt failed"
+            if [[ $attempt -lt $max_attempts ]]; then
+                sleep 2
+            fi
+        fi
+    done
+    
+    echo "Error: Failed to download after $max_attempts attempts: $url"
+    return 1
+}
+
+# Service management functions
+start_service() {
     local service_name="$1"
-    
-    systemctl enable "$service_name" &> /dev/null
-    systemctl start "$service_name" &> /dev/null
-    
-    if systemctl is-active --quiet "$service_name"; then
-        print_success "Service enabled and started: $service_name"
+    if systemctl start "$service_name" 2>/dev/null; then
+        echo "Started service: $service_name"
         return 0
     else
-        print_error "Failed to start service: $service_name"
+        echo "Error: Failed to start service: $service_name"
         return 1
     fi
 }
 
-# Disable and stop service
-disable_service() {
+stop_service() {
     local service_name="$1"
-    
-    systemctl stop "$service_name" &> /dev/null
-    systemctl disable "$service_name" &> /dev/null
-    
-    print_info "Service stopped and disabled: $service_name"
-}
-
-# Function to display loading animation
-show_loading() {
-    local pid=$1
-    local delay=0.1
-    local spinstr='|/-\'
-    
-    while [[ "$(ps a | awk '{print $1}' | grep $pid)" ]]; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
-}
-
-# Execute command with loading animation
-execute_with_loading() {
-    local command="$1"
-    local message="$2"
-    
-    print_info "$message"
-    
-    # Execute command in background
-    eval "$command" &
-    local pid=$!
-    
-    # Show loading animation
-    show_loading $pid
-    
-    # Wait for command to complete
-    wait $pid
-    local exit_code=$?
-    
-    if [[ $exit_code -eq 0 ]]; then
-        print_success "Completed: $message"
+    if systemctl stop "$service_name" 2>/dev/null; then
+        echo "Stopped service: $service_name"
+        return 0
     else
-        print_error "Failed: $message"
+        echo "Error: Failed to stop service: $service_name"
+        return 1
     fi
-    
-    return $exit_code
 }
 
-# Export functions for use in other scripts
-export -f get_system_info check_root check_compatibility
-export -f print_banner print_section print_success print_error print_warning print_info
-export -f generate_random_string generate_uuid check_port wait_for_service
-export -f create_directory backup_file download_file check_internet get_public_ip validate_ip
-export -f command_exists install_package enable_service disable_service
-export -f show_loading execute_with_loading
+enable_service() {
+    local service_name="$1"
+    if systemctl enable "$service_name" 2>/dev/null; then
+        echo "Enabled service: $service_name"
+        return 0
+    else
+        echo "Error: Failed to enable service: $service_name"
+        return 1
+    fi
+}
+
+restart_service() {
+    local service_name="$1"
+    if systemctl restart "$service_name" 2>/dev/null; then
+        echo "Restarted service: $service_name"
+        return 0
+    else
+        echo "Error: Failed to restart service: $service_name"
+        return 1
+    fi
+}
+
+# Check service status
+check_service_status() {
+    local service_name="$1"
+    systemctl is-active --quiet "$service_name"
+}
+
+# Wait for service to be ready
+wait_for_service() {
+    local service_name="$1"
+    local max_wait="${2:-30}"
+    local count=0
+    
+    echo "Waiting for service $service_name to be ready..."
+    while [[ $count -lt $max_wait ]]; do
+        if check_service_status "$service_name"; then
+            echo "Service $service_name is ready"
+            return 0
+        fi
+        sleep 1
+        ((count++))
+    done
+    
+    echo "Error: Service $service_name failed to start within ${max_wait}s"
+    return 1
+}
