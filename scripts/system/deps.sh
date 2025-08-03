@@ -9,34 +9,25 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Source utilities
 source "$PROJECT_ROOT/utils/common.sh"
-source "$PROJECT_ROOT/utils/logger.sh"
 source "$PROJECT_ROOT/config/system.conf"
-
-# Initialize logging
-init_logging
 
 # Function to update package repository
 update_package_repository() {
-    log_function_start "update_package_repository"
-    
     print_section "Updating Package Repository"
     
     # Update package lists
-    if log_command "apt-get update" "Updating package lists"; then
-        log_info "Package repository updated successfully"
+    if apt-get update &>/dev/null; then
+        print_success "Package repository updated successfully"
     else
-        log_error "Failed to update package repository"
+        print_error "Failed to update package repository"
         return 1
     fi
     
-    log_function_end "update_package_repository" 0
     return 0
 }
 
 # Function to install required packages
 install_required_packages() {
-    log_function_start "install_required_packages"
-    
     print_section "Installing Required Packages"
     
     local failed_packages=()
@@ -46,10 +37,8 @@ install_required_packages() {
         
         if apt-get install -y "$package" &>/dev/null; then
             print_success "Installed: $package"
-            log_info "Successfully installed package: $package"
         else
             print_error "Failed to install: $package"
-            log_error "Failed to install package: $package"
             failed_packages+=("$package")
         fi
     done
@@ -57,19 +46,15 @@ install_required_packages() {
     # Check if any required packages failed
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
         print_error "Failed to install required packages: ${failed_packages[*]}"
-        log_error "Critical packages installation failed: ${failed_packages[*]}"
         return 1
     fi
     
     print_success "All required packages installed successfully"
-    log_function_end "install_required_packages" 0
     return 0
 }
 
 # Function to install optional packages
 install_optional_packages() {
-    log_function_start "install_optional_packages"
-    
     print_section "Installing Optional Packages"
     
     local failed_packages=()
@@ -79,27 +64,21 @@ install_optional_packages() {
         
         if apt-get install -y "$package" &>/dev/null; then
             print_success "Installed: $package"
-            log_info "Successfully installed optional package: $package"
         else
             print_warning "Failed to install optional package: $package"
-            log_warn "Failed to install optional package: $package"
             failed_packages+=("$package")
         fi
     done
     
     if [[ ${#failed_packages[@]} -gt 0 ]]; then
         print_warning "Some optional packages failed to install: ${failed_packages[*]}"
-        log_warn "Optional packages installation failed: ${failed_packages[*]}"
     fi
     
-    log_function_end "install_optional_packages" 0
     return 0
 }
 
 # Function to install development tools
 install_development_tools() {
-    log_function_start "install_development_tools"
-    
     print_section "Installing Development Tools"
     
     local dev_packages=(
@@ -123,23 +102,18 @@ install_development_tools() {
     for package in "${dev_packages[@]}"; do
         if apt-get install -y "$package" &>/dev/null; then
             print_success "Installed dev tool: $package"
-            log_debug "Successfully installed development tool: $package"
         else
             print_warning "Failed to install dev tool: $package"
-            log_warn "Failed to install development tool: $package"
         fi
     done
     
-    log_function_end "install_development_tools" 0
     return 0
 }
 
 # Function to install specific version of Xray-core
 install_xray_core() {
-    log_function_start "install_xray_core"
-    
     if [[ "$ENABLE_XRAY" != "true" ]]; then
-        log_info "Xray installation skipped (disabled in config)"
+        print_info "Xray installation skipped (disabled in config)"
         return 0
     fi
     
@@ -157,7 +131,6 @@ install_xray_core() {
         armv7l)  arch="linux-arm32-v7a" ;;
         *)
             print_error "Unsupported architecture: $(uname -m)"
-            log_error "Unsupported architecture for Xray: $(uname -m)"
             return 1
             ;;
     esac
@@ -177,7 +150,6 @@ install_xray_core() {
             if cp xray /usr/local/bin/; then
                 chmod +x /usr/local/bin/xray
                 print_success "Xray binary installed successfully"
-                log_info "Xray binary installed to /usr/local/bin/xray"
             else
                 print_error "Failed to install Xray binary"
                 return 1
@@ -206,22 +178,18 @@ install_xray_core() {
     if command_exists xray; then
         local xray_version=$(xray version | head -n1)
         print_success "Xray-core installed: $xray_version"
-        log_info "Xray-core installation completed: $xray_version"
     else
         print_error "Xray installation verification failed"
         return 1
     fi
     
-    log_function_end "install_xray_core" 0
     return 0
 }
 
 # Function to install Dropbear SSH
 install_dropbear() {
-    log_function_start "install_dropbear"
-    
     if [[ "$ENABLE_DROPBEAR" != "true" ]]; then
-        log_info "Dropbear installation skipped (disabled in config)"
+        print_info "Dropbear installation skipped (disabled in config)"
         return 0
     fi
     
@@ -234,29 +202,25 @@ install_dropbear() {
         systemctl disable dropbear &>/dev/null
         
         print_success "Dropbear installed successfully"
-        log_info "Dropbear SSH server installed"
     else
         print_error "Failed to install Dropbear"
         return 1
     fi
     
-    log_function_end "install_dropbear" 0
     return 0
 }
 
 # Function to configure package auto-removal
 configure_auto_removal() {
-    log_function_start "configure_auto_removal"
-    
     print_section "Configuring Automatic Package Cleanup"
     
     # Remove unnecessary packages
-    if log_command "apt-get autoremove -y" "Removing unnecessary packages"; then
+    if apt-get autoremove -y &>/dev/null; then
         print_success "Unnecessary packages removed"
     fi
     
     # Clean package cache
-    if log_command "apt-get autoclean" "Cleaning package cache"; then
+    if apt-get autoclean &>/dev/null; then
         print_success "Package cache cleaned"
     fi
     
@@ -272,17 +236,13 @@ APT::Periodic::Unattended-Upgrade "1";
 EOF
         
         print_success "Automatic security updates configured"
-        log_info "Automatic security updates configured"
     fi
     
-    log_function_end "configure_auto_removal" 0
     return 0
 }
 
 # Function to verify all installations
 verify_installations() {
-    log_function_start "verify_installations"
-    
     print_section "Verifying Installations"
     
     local verification_failed=false
@@ -304,10 +264,8 @@ verify_installations() {
     for cmd in "${required_commands[@]}"; do
         if command_exists "$cmd"; then
             print_success "✓ $cmd is available"
-            log_debug "Command verification passed: $cmd"
         else
             print_error "✗ $cmd is not available"
-            log_error "Command verification failed: $cmd"
             verification_failed=true
         fi
     done
@@ -318,10 +276,8 @@ verify_installations() {
     for cmd in "${optional_commands[@]}"; do
         if command_exists "$cmd"; then
             print_info "✓ $cmd is available (optional)"
-            log_debug "Optional command available: $cmd"
         else
             print_warning "✗ $cmd is not available (optional)"
-            log_debug "Optional command not available: $cmd"
         fi
     done
     
@@ -329,10 +285,8 @@ verify_installations() {
     if [[ "$ENABLE_XRAY" == "true" ]]; then
         if command_exists xray; then
             print_success "✓ Xray-core is installed"
-            log_info "Xray-core verification passed"
         else
             print_error "✗ Xray-core is not installed"
-            log_error "Xray-core verification failed"
             verification_failed=true
         fi
     fi
@@ -341,29 +295,23 @@ verify_installations() {
     if [[ "$ENABLE_DROPBEAR" == "true" ]]; then
         if command_exists dropbear; then
             print_success "✓ Dropbear is installed"
-            log_info "Dropbear verification passed"
         else
             print_error "✗ Dropbear is not installed"
-            log_error "Dropbear verification failed"
             verification_failed=true
         fi
     fi
     
     if [[ "$verification_failed" == "true" ]]; then
         print_error "Some installations failed verification"
-        log_function_end "verify_installations" 1
         return 1
     else
         print_success "All installations verified successfully"
-        log_function_end "verify_installations" 0
         return 0
     fi
 }
 
 # Main installation function
 main() {
-    log_function_start "main"
-    
     # Check if running as root
     check_root
     
@@ -372,7 +320,8 @@ main() {
     
     # Check internet connectivity
     if ! check_internet; then
-        log_fatal "Internet connectivity required for installation"
+        print_error "Internet connectivity required for installation"
+        exit 1
     fi
     
     print_banner
@@ -380,12 +329,14 @@ main() {
     
     # Update package repository
     if ! update_package_repository; then
-        log_fatal "Failed to update package repository"
+        print_error "Failed to update package repository"
+        exit 1
     fi
     
     # Install required packages
     if ! install_required_packages; then
-        log_fatal "Failed to install required packages"
+        print_error "Failed to install required packages"
+        exit 1
     fi
     
     # Install optional packages
@@ -396,12 +347,12 @@ main() {
     
     # Install Xray-core
     if ! install_xray_core; then
-        log_error "Xray-core installation failed"
+        print_error "Xray-core installation failed"
     fi
     
     # Install Dropbear
     if ! install_dropbear; then
-        log_error "Dropbear installation failed"
+        print_error "Dropbear installation failed"
     fi
     
     # Configure auto-removal
@@ -409,14 +360,11 @@ main() {
     
     # Verify installations
     if ! verify_installations; then
-        log_error "Installation verification failed"
+        print_error "Installation verification failed"
         exit 1
     fi
     
     print_success "Dependencies installation completed successfully"
-    log_info "Dependencies installation completed successfully"
-    
-    log_function_end "main" 0
 }
 
 # Run main function if script is executed directly

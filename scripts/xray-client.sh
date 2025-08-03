@@ -56,7 +56,7 @@ EOF
     echo "Client ID: $client_id"
     
     # Restart VMess service
-    restart_service "xray-vmess"
+    restart_service "spectrum"
     
     return 0
 }
@@ -86,7 +86,7 @@ EOF
     echo "Client ID: $client_id"
     
     # Restart VLESS service
-    restart_service "xray-vless"
+    restart_service "quantix"
     
     return 0
 }
@@ -116,7 +116,7 @@ EOF
     echo "Password: $password"
     
     # Restart Trojan service
-    restart_service "xray-trojan"
+    restart_service "cipheron"
     
     return 0
 }
