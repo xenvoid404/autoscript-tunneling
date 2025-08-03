@@ -58,19 +58,66 @@ check_root() {
     fi
 }
 
+# Function to compare version numbers
+version_compare() {
+    local version1=$1
+    local operator=$2  
+    local version2=$3
+    
+    # Convert versions to comparable format (handle major.minor)
+    local v1_major=$(echo "$version1" | cut -d. -f1)
+    local v1_minor=$(echo "$version1" | cut -d. -f2 2>/dev/null || echo "0")
+    local v2_major=$(echo "$version2" | cut -d. -f1)
+    local v2_minor=$(echo "$version2" | cut -d. -f2 2>/dev/null || echo "0")
+    
+    # Handle fractional parts properly
+    # For versions like 11.9, convert to 1190 (11 * 100 + 90)
+    # For integer versions like 11, convert to 1100 (11 * 100 + 0)
+    if [[ "$v1_minor" =~ ^[0-9]+$ ]] && [[ ${#v1_minor} -eq 1 ]]; then
+        v1_minor=$((v1_minor * 10))  # 9 becomes 90
+    fi
+    if [[ "$v2_minor" =~ ^[0-9]+$ ]] && [[ ${#v2_minor} -eq 1 ]]; then
+        v2_minor=$((v2_minor * 10))  # 9 becomes 90
+    fi
+    
+    local v1_int=$((v1_major * 100 + v1_minor))
+    local v2_int=$((v2_major * 100 + v2_minor))
+    
+    case $operator in
+        ">=")
+            [[ $v1_int -ge $v2_int ]]
+            ;;
+        ">")
+            [[ $v1_int -gt $v2_int ]]
+            ;;
+        "=")
+            [[ $v1_int -eq $v2_int ]]
+            ;;
+        "<")
+            [[ $v1_int -lt $v2_int ]]
+            ;;
+        "<=")
+            [[ $v1_int -le $v2_int ]]
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # Check system compatibility
 check_system() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
         case $NAME in
             "Ubuntu")
-                if [[ $(echo "$VERSION_ID >= 22.04" | bc -l 2>/dev/null || echo "0") -eq 0 ]]; then
+                if ! version_compare "$VERSION_ID" ">=" "22.04"; then
                     print_error "Ubuntu 22.04+ required. Current: $VERSION_ID"
                     exit 1
                 fi
                 ;;
             "Debian GNU/Linux")
-                if [[ $(echo "$VERSION_ID >= 11" | bc -l 2>/dev/null || echo "0") -eq 0 ]]; then
+                if ! version_compare "$VERSION_ID" ">=" "11"; then
                     print_error "Debian 11+ required. Current: $VERSION_ID"
                     exit 1
                 fi
@@ -145,11 +192,6 @@ main() {
         print_info "Installing wget..."
         apt-get update &> /dev/null
         apt-get install -y wget &> /dev/null
-    fi
-    
-    if ! command -v bc &> /dev/null; then
-        print_info "Installing bc calculator..."
-        apt-get install -y bc &> /dev/null
     fi
     
     # Download and run main installer
