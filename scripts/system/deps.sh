@@ -29,13 +29,6 @@ update_package_repository() {
         return 1
     fi
     
-    # Upgrade existing packages
-    if log_command "apt-get upgrade -y" "Upgrading existing packages"; then
-        log_info "System packages upgraded successfully"
-    else
-        log_warn "Some packages failed to upgrade, continuing..."
-    fi
-    
     log_function_end "update_package_repository" 0
     return 0
 }

@@ -382,7 +382,7 @@ setup_cron_jobs() {
 0 4 * * * find /tmp -type f -atime +1 -delete
 
 # Update system weekly
-0 2 * * 0 apt-get update && apt-get upgrade -y
+0 2 * * 0 apt-get update
 
 # Check disk space daily
 0 6 * * * df -h | grep -E '9[0-9]%|100%' && echo "Disk space warning" | logger
