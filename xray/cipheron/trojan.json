@@ -1,0 +1,58 @@
+{
+    "stats": {},
+    "api": {
+        "tag": "api",
+        "services": ["StatsService", "HandlerService", "RoutingService"]
+    },
+    "policy": {
+        "levels": {
+            "0": {
+                "statsUserUplink": true,
+                "statsUserDownlink": true
+            }
+        },
+        "system": {
+            "statsInboundUplink": true,
+            "statsInboundDownlink": true,
+            "statsOutboundUplink": true,
+            "statsOutboundDownlink": true
+        }
+    },
+    "log": {
+        "access": "/var/log/xray/access3.log",
+        "error": "/var/log/xray/error3.log",
+        "loglevel": "info"
+    },
+    "inbounds": [
+        {
+            "listen": "127.0.0.1",
+            "port": 10003,
+            "protocol": "dokodemo-door",
+            "settings": {
+                "address": "127.0.0.1"
+            },
+            "tag": "api"
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "protocol": "blackhole",
+            "settings": {},
+            "tag": "block"
+        }
+    ],
+    "routing": {
+        "domainStrategy": "IPIfNonMatch",
+        "rules": [
+            {
+                "inboundTag": ["api"],
+                "outboundTag": "api",
+                "type": "field"
+            }
+        ]
+    }
+}

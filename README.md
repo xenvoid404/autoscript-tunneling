@@ -4,45 +4,50 @@
 
 ## 🚀 Features
 
-- **SSH Tunneling** - OpenSSH Server & Dropbear SSH
-- **Xray-core Protocols** - VMess, VLESS, Trojan
-- **WebSocket Tunneling** - ws, wss protocols
-- **Advanced Account Management** - Create, update, delete accounts
-- **Production Ready** - Comprehensive logging, error handling, input validation
-- **Auto Optimization** - System optimization dan firewall configuration
-- **Multi Protocol Support** - Berbagai protokol untuk berbagai kebutuhan
+-   **SSH Tunneling** - OpenSSH Server & Dropbear SSH
+-   **Xray-core Protocols** - VMess, VLESS, Trojan
+-   **WebSocket Tunneling** - ws, wss protocols
+-   **Advanced Account Management** - Create, update, delete accounts
+-   **Production Ready** - Comprehensive logging, error handling, input validation
+-   **Auto Optimization** - System optimization dan firewall configuration
+-   **Multi Protocol Support** - Berbagai protokol untuk berbagai kebutuhan
 
 ## 📋 System Requirements
 
 ### Operating System
-- **Debian 11+** (Bullseye atau newer)
-- **Ubuntu 22.04+** (Jammy Jellyfish atau newer)
+
+-   **Debian 11+** (Bullseye atau newer)
+-   **Ubuntu 22.04+** (Jammy Jellyfish atau newer)
 
 ### Hardware Requirements
-- **RAM**: Minimal 512MB (1GB recommended)
-- **Storage**: Minimal 2GB free space
-- **CPU**: 1 core (2 cores recommended)
-- **Network**: Public IP address
+
+-   **RAM**: Minimal 512MB (1GB recommended)
+-   **Storage**: Minimal 2GB free space
+-   **CPU**: 1 core (2 cores recommended)
+-   **Network**: Public IP address
 
 ### Prerequisites
-- Root access ke server
-- Koneksi internet yang stabil
-- Basic knowledge of Linux commands
+
+-   Root access ke server
+-   Koneksi internet yang stabil
+-   Basic knowledge of Linux commands
 
 ## 🛡️ Supported Protocols
 
 ### SSH Tunneling
-- **OpenSSH Server** - Port 22 (default)
-- **Dropbear SSH** - Port 109
-- **Dropbear WebSocket** - Port 143
-- **SSH WebSocket Tunnel** - Port 8880
+
+-   **OpenSSH Server** - Port 22 (default)
+-   **Dropbear SSH** - Port 109
+-   **Dropbear WebSocket** - Port 143
+-   **SSH WebSocket Tunnel** - Port 8880
 
 ### Xray-core Protocols
-- **VMess TCP** - Port 8080
-- **VMess WebSocket+TLS** - Port 443
-- **VLESS TCP** - Port 8081
-- **VLESS WebSocket+TLS** - Port 443
-- **Trojan TCP+TLS** - Port 8443
+
+-   **VMess TCP** - Port 8080
+-   **VMess WebSocket+TLS** - Port 443
+-   **VLESS TCP** - Port 8081
+-   **VLESS WebSocket+TLS** - Port 443
+-   **Trojan TCP+TLS** - Port 8443
 
 ## ⚡ Quick Installation
 
@@ -227,31 +232,34 @@ autoscript update
 ### Common Issues
 
 1. **Port sudah digunakan**
-   ```bash
-   # Check port usage
-   netstat -tulpn | grep :PORT_NUMBER
-   
-   # Kill process using port
-   sudo kill -9 PID
-   ```
+
+    ```bash
+    # Check port usage
+    netstat -tulpn | grep :PORT_NUMBER
+
+    # Kill process using port
+    sudo kill -9 PID
+    ```
 
 2. **Service tidak bisa start**
-   ```bash
-   # Check service status
-   systemctl status SERVICE_NAME
-   
-   # Check logs
-   journalctl -u SERVICE_NAME -f
-   ```
+
+    ```bash
+    # Check service status
+    systemctl status SERVICE_NAME
+
+    # Check logs
+    journalctl -u SERVICE_NAME -f
+    ```
 
 3. **Koneksi timeout**
-   ```bash
-   # Check firewall
-   ufw status
-   
-   # Allow port
-   ufw allow PORT_NUMBER
-   ```
+
+    ```bash
+    # Check firewall
+    ufw status
+
+    # Allow port
+    ufw allow PORT_NUMBER
+    ```
 
 ### Reset Installation
 
@@ -267,19 +275,19 @@ rm -rf /opt/autoscript /etc/autoscript /var/log/autoscript
 
 Script ini sudah include optimasi sistem:
 
-- **TCP BBR** congestion control
-- **Kernel parameters** tuning
-- **Network buffers** optimization
-- **System limits** adjustment
-- **Automatic cleanup** via cron jobs
+-   **TCP BBR** congestion control
+-   **Kernel parameters** tuning
+-   **Network buffers** optimization
+-   **System limits** adjustment
+-   **Automatic cleanup** via cron jobs
 
 ## 🔒 Security Features
 
-- **Firewall** configuration otomatis
-- **Fail2ban** protection
-- **SSH key** authentication support
-- **Account expiration** management
-- **Traffic monitoring** and logging
+-   **Firewall** configuration otomatis
+-   **Fail2ban** protection
+-   **SSH key** authentication support
+-   **Account expiration** management
+-   **Traffic monitoring** and logging
 
 ## 📝 License
 
@@ -288,7 +296,8 @@ MIT License - see LICENSE file for details
 ## 👨‍💻 Author
 
 **Yuipedia**
-- GitHub: [@xenvoid404](https://github.com/xenvoid404)
+
+-   GitHub: [@xenvoid404](https://github.com/xenvoid404)
 
 ## 🤝 Contributing
 
@@ -307,30 +316,3 @@ Jika script ini berguna, please give a star ⭐ pada repository ini!
 **Version**: 2.0.0  
 **Last Updated**: 2024  
 **Tested On**: Debian 11+, Ubuntu 22.04+
-
-## 📋 Installation Options
-
-The installer supports several command-line options for different scenarios:
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--yes` | `-y` | Automatically answer "yes" to all prompts |
-| `--force` | `-f` | Force reinstallation even if already installed |
-| `--non-interactive` | - | Run in completely non-interactive mode |
-| `--help` | `-h` | Show help information |
-
-### Usage Examples
-
-```bash
-# Interactive installation (default)
-curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash
-
-# Auto-confirm all prompts
-curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash -s -- --yes
-
-# Force reinstall with auto-confirm
-curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash -s -- --force --yes
-
-# Non-interactive mode (for automation)
-curl -fsSL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh | bash -s -- --non-interactive
-```
