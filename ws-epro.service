@@ -1,0 +1,15 @@
+[Unit]
+Description=WebSocket to SSH/Dropbear Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/ws-epro -f /etc/ws-epro/config.yml
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
