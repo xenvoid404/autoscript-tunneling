@@ -1,9 +1,0 @@
-bind: "0.0.0.0:8080"
-upstream:
-  - name: "openssh"
-    addr: "127.0.0.1:22"
-    path: "/ssh"
-  - name: "dropbear"  
-    addr: "127.0.0.1:2222"
-    path: "/dropbear"
-log_level: "info"

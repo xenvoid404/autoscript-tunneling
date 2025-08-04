@@ -23,7 +23,7 @@ sleep 2
 
 # Start ws-epro WebSocket proxy
 echo "Starting ws-epro WebSocket proxy..."
-/usr/local/bin/ws-epro -f /etc/ws-epro/config.yml &
+/usr/local/bin/ws-epro -f /etc/ws-epro/tunws.conf &
 
 # Wait and verify services
 sleep 3

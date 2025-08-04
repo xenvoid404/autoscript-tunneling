@@ -28,7 +28,7 @@ print_warning() {
 }
 
 # URL untuk download script (ganti dengan URL yang sesuai)
-SCRIPT_URL="https://raw.githubusercontent.com/your-repo/autoscript-tunnel/main/autoscript-tunnel.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/xenvoid/autoscript-tunneling/master/autoscript-tunnel.sh"
 SCRIPT_NAME="autoscript-tunnel.sh"
 TEMP_DIR="/tmp/autoscript-tunnel"
 
