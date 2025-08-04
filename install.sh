@@ -157,32 +157,159 @@ show_info() {
     echo "    Debian 11/12 & Ubuntu 22/24"
     echo "=============================================="
     echo
-    print_info "Script ini akan:"
-    echo "  1. Download autoscript tunneling terbaru"
-    echo "  2. Install dan konfigurasi OpenSSH"
-    echo "  3. Install dan konfigurasi Dropbear"
-    echo "  4. Setup multiple port untuk tunneling"
-    echo "  5. Enable auto-start services"
+    print_info "Pilih mode instalasi:"
+    echo "  1. Standard Tunneling (SSH + Dropbear)"
+    echo "  2. WebSocket SSH untuk HTTP Injector"
+    echo "  3. Install keduanya (Standard + WebSocket)"
     echo
     print_warning "Pastikan Anda menjalankan script ini di fresh VPS"
     print_warning "atau backup konfigurasi SSH yang ada terlebih dahulu"
     echo
 }
 
-# Fungsi untuk konfirmasi user
-confirm_installation() {
-    echo -n "Lanjutkan instalasi? (y/n): "
-    read -r response
+# Fungsi untuk install WebSocket SSH
+install_websocket_ssh() {
+    print_info "=== Installing WebSocket SSH untuk HTTP Injector ==="
     
-    case "$response" in
-        [yY]|[yY][eE][sS])
-            return 0
-            ;;
-        *)
-            print_info "Instalasi dibatalkan oleh user"
-            exit 0
-            ;;
-    esac
+    # Install packages
+    print_info "Installing required packages..."
+    apt install -y openssh-server dropbear-bin curl
+    
+    # Download ws-epro
+    print_info "Downloading ws-epro WebSocket proxy..."
+    curl -sL -o /usr/local/bin/ws-epro https://raw.githubusercontent.com/essoojay/PROXY-SSH-OVER-CDN/master/ws-epro/ws-epro
+    chmod +x /usr/local/bin/ws-epro
+    
+    # Create config directory
+    mkdir -p /etc/ws-epro
+    
+    # Create ws-epro configuration
+    print_info "Creating WebSocket configuration..."
+    cat > /etc/ws-epro/config.yml << 'EOF'
+# verbose level 0=info, 1=verbose, 2=very verbose
+verbose: 1
+listen:
+  # openssh
+  - target_host: 127.0.0.1
+    target_port: 22
+    listen_port: 8080
+
+  # dropbear  
+  - target_host: 127.0.0.1
+    target_port: 2222
+    listen_port: 8081
+EOF
+    
+    # Create systemd service
+    print_info "Creating systemd service..."
+    cat > /etc/systemd/system/ws-epro.service << 'EOF'
+[Unit]
+Description=WebSocket to SSH/Dropbear Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/ws-epro -f /etc/ws-epro/config.yml
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Create startup script
+    print_info "Creating startup script..."
+    cat > /root/start-websocket-ssh.sh << 'EOF'
+#!/bin/bash
+
+echo "=== Starting WebSocket SSH Services ==="
+
+# Stop existing processes
+sudo pkill sshd dropbear ws-epro 2>/dev/null || true
+sleep 2
+
+# Start SSH on port 22
+echo "Starting OpenSSH on port 22..."
+sudo /usr/sbin/sshd -p 22
+
+# Start Dropbear on port 2222
+echo "Starting Dropbear on port 2222..."
+sudo dropbear -p 2222 -F &
+
+# Wait for services to start
+sleep 3
+
+# Start ws-epro WebSocket proxy
+echo "Starting ws-epro WebSocket proxy..."
+/usr/local/bin/ws-epro -f /etc/ws-epro/config.yml &
+
+# Wait for ws-epro to start
+sleep 3
+
+echo ""
+echo "=== Service Status ==="
+
+# Check services
+if pgrep sshd > /dev/null; then
+    echo "✓ OpenSSH is running on port 22"
+else
+    echo "✗ OpenSSH failed to start"
+fi
+
+if pgrep dropbear > /dev/null; then
+    echo "✓ Dropbear is running on port 2222"
+else
+    echo "✗ Dropbear failed to start"
+fi
+
+if pgrep ws-epro > /dev/null; then
+    echo "✓ ws-epro WebSocket proxy is running"
+    echo ""
+    echo "=== WebSocket URLs for HTTP Injector ==="
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || echo "YOUR_SERVER_IP")
+    echo "SSH (OpenSSH):  ws://${SERVER_IP}:8080"
+    echo "SSH (Dropbear): ws://${SERVER_IP}:8081"
+else
+    echo "✗ ws-epro failed to start"
+fi
+
+echo ""
+echo "=== Configuration for HTTP Injector ==="
+echo "1. Open HTTP Injector"
+echo "2. Select Custom SSH"
+echo "3. Set Connection Type: WebSocket"
+echo "4. Use the WebSocket URLs shown above"
+echo ""
+EOF
+    
+    chmod +x /root/start-websocket-ssh.sh
+    
+    # Configure firewall if available
+    if command -v ufw >/dev/null 2>&1; then
+        print_info "Configuring firewall..."
+        ufw allow 22,2222,8080,8081/tcp 2>/dev/null || true
+    fi
+    
+    # Enable and start services
+    if systemctl --version >/dev/null 2>&1; then
+        systemctl daemon-reload
+        systemctl enable ws-epro ssh 2>/dev/null || true
+    fi
+    
+    print_success "WebSocket SSH installation completed!"
+    
+    # Show WebSocket URLs
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || echo "YOUR_SERVER_IP")
+    echo
+    print_info "=== WebSocket URLs for HTTP Injector ==="
+    echo "SSH (OpenSSH):  ws://${SERVER_IP}:8080"
+    echo "SSH (Dropbear): ws://${SERVER_IP}:8081"
+    echo
+    print_info "Startup script: /root/start-websocket-ssh.sh"
+    echo
 }
 
 # Fungsi offline mode (jika script sudah ada)
@@ -213,10 +340,12 @@ main() {
     # Cek root
     check_root
     
-    # Cek offline mode
-    offline_mode
+    # Cek offline mode (hanya untuk standard mode)
+    if [ "$1" != "--websocket" ]; then
+        offline_mode
+    fi
     
-    # Konfirmasi
+    # Konfirmasi dan pilih mode
     confirm_installation
     
     # Cek koneksi internet
@@ -227,22 +356,70 @@ main() {
     # Install dependencies
     install_dependencies
     
-    # Download script
-    download_script
+    # Execute based on selected mode
+    case "$INSTALL_MODE" in
+        "standard")
+            # Download script
+            download_script
+            
+            # Jalankan script utama
+            run_main_script
+            
+            # Cleanup
+            cleanup
+            
+            echo
+            print_success "=============================================="
+            print_success "    STANDARD TUNNELING INSTALL SELESAI!"
+            print_success "=============================================="
+            echo
+            print_info "Autoscript tunneling telah berhasil diinstall"
+            print_info "Anda sekarang dapat menggunakan SSH tunneling"
+            ;;
+            
+        "websocket")
+            # Install WebSocket SSH
+            install_websocket_ssh
+            
+            echo
+            print_success "=============================================="
+            print_success "    WEBSOCKET SSH INSTALL SELESAI!"
+            print_success "=============================================="
+            echo
+            print_info "WebSocket SSH untuk HTTP Injector telah berhasil diinstall"
+            print_info "Gunakan /root/start-websocket-ssh.sh untuk menjalankan services"
+            ;;
+            
+        "both")
+            # Install WebSocket SSH first
+            install_websocket_ssh
+            
+            echo
+            print_info "=============================================="
+            print_info "    MELANJUTKAN KE STANDARD TUNNELING..."
+            print_info "=============================================="
+            echo
+            
+            # Download script
+            download_script
+            
+            # Jalankan script utama
+            run_main_script
+            
+            # Cleanup
+            cleanup
+            
+            echo
+            print_success "=============================================="
+            print_success "    SEMUA INSTALASI SELESAI!"
+            print_success "=============================================="
+            echo
+            print_info "Standard tunneling dan WebSocket SSH telah berhasil diinstall"
+            print_info "WebSocket SSH: /root/start-websocket-ssh.sh"
+            print_info "Standard tunneling: Ikuti instruksi di atas"
+            ;;
+    esac
     
-    # Jalankan script utama
-    run_main_script
-    
-    # Cleanup
-    cleanup
-    
-    echo
-    print_success "=============================================="
-    print_success "    QUICK INSTALL SELESAI!"
-    print_success "=============================================="
-    echo
-    print_info "Autoscript tunneling telah berhasil diinstall"
-    print_info "Anda sekarang dapat menggunakan SSH tunneling"
     echo
     print_info "Untuk test instalasi, jalankan:"
     echo "  wget -O test.sh https://raw.githubusercontent.com/your-repo/test-tunnel.sh"
@@ -250,8 +427,111 @@ main() {
     echo
 }
 
+# Fungsi untuk menampilkan help
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --websocket    Install WebSocket SSH only untuk HTTP Injector"
+    echo "  --standard     Install Standard Tunneling only"
+    echo "  --both         Install both WebSocket SSH dan Standard Tunneling"
+    echo "  --help         Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                    # Interactive mode"
+    echo "  $0 --websocket       # Install WebSocket SSH only"
+    echo "  $0 --both            # Install both modes"
+    echo ""
+}
+
+# Parse command line arguments
+parse_args() {
+    case "$1" in
+        --websocket)
+            INSTALL_MODE="websocket"
+            NON_INTERACTIVE=true
+            ;;
+        --standard)
+            INSTALL_MODE="standard"
+            NON_INTERACTIVE=true
+            ;;
+        --both)
+            INSTALL_MODE="both"
+            NON_INTERACTIVE=true
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        "")
+            # Interactive mode
+            NON_INTERACTIVE=false
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# Modified confirm_installation for non-interactive mode
+confirm_installation() {
+    if [ "$NON_INTERACTIVE" = true ]; then
+        case "$INSTALL_MODE" in
+            "standard")
+                print_info "Mode: Standard Tunneling (non-interactive)"
+                ;;
+            "websocket")
+                print_info "Mode: WebSocket SSH (non-interactive)"
+                ;;
+            "both")
+                print_info "Mode: Standard + WebSocket (non-interactive)"
+                ;;
+        esac
+        return 0
+    fi
+    
+    echo -n "Pilih mode instalasi (1/2/3): "
+    read -r choice
+    
+    case "$choice" in
+        1)
+            INSTALL_MODE="standard"
+            print_info "Mode: Standard Tunneling dipilih"
+            ;;
+        2)
+            INSTALL_MODE="websocket"
+            print_info "Mode: WebSocket SSH dipilih"
+            ;;
+        3)
+            INSTALL_MODE="both"
+            print_info "Mode: Standard + WebSocket dipilih"
+            ;;
+        *)
+            print_error "Pilihan tidak valid"
+            exit 1
+            ;;
+    esac
+    
+    echo
+    echo -n "Lanjutkan instalasi? (y/n): "
+    read -r response
+    
+    case "$response" in
+        [yY]|[yY][eE][sS])
+            return 0
+            ;;
+        *)
+            print_info "Instalasi dibatalkan oleh user"
+            exit 0
+            ;;
+    esac
+}
+
 # Trap untuk cleanup saat script dihentikan
 trap cleanup EXIT
 
-# Jalankan fungsi utama
+# Parse arguments and run main function
+parse_args "$1"
 main "$@"
