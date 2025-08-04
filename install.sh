@@ -27,11 +27,6 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# URL untuk download script (ganti dengan URL yang sesuai)
-SCRIPT_URL="https://raw.githubusercontent.com/xenvoid/autoscript-tunneling/master/autoscript-tunnel.sh"
-SCRIPT_NAME="autoscript-tunnel.sh"
-TEMP_DIR="/tmp/autoscript-tunnel"
-
 # Fungsi untuk mengecek apakah script dijalankan sebagai root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
@@ -88,43 +83,15 @@ install_dependencies() {
     fi
 }
 
-# Fungsi untuk download script
-download_script() {
-    print_info "Mendownload autoscript tunneling..."
-    
-    # Buat direktori temporary
-    mkdir -p "$TEMP_DIR"
-    cd "$TEMP_DIR"
-    
-    # Download menggunakan wget atau curl
-    if command -v wget >/dev/null 2>&1; then
-        wget -O "$SCRIPT_NAME" "$SCRIPT_URL" 2>/dev/null
-    elif command -v curl >/dev/null 2>&1; then
-        curl -o "$SCRIPT_NAME" "$SCRIPT_URL" 2>/dev/null
-    else
-        print_error "wget atau curl tidak tersedia"
-        exit 1
-    fi
-    
-    if [ $? -eq 0 ] && [ -f "$SCRIPT_NAME" ]; then
-        print_success "Script berhasil didownload"
-        chmod +x "$SCRIPT_NAME"
-    else
-        print_error "Gagal mendownload script"
-        print_info "Coba download manual dari: $SCRIPT_URL"
-        exit 1
-    fi
-}
-
-# Fungsi untuk menjalankan script utama
-run_main_script() {
-    print_info "Menjalankan autoscript tunneling..."
+# Fungsi untuk menjalankan script SSH
+run_ssh_script() {
+    print_info "Menjalankan installer SSH..."
     echo
     echo "=============================================="
     echo
     
-    # Jalankan script utama
-    bash "$TEMP_DIR/$SCRIPT_NAME"
+    # Jalankan script SSH
+    bash "./installer/ssh.sh"
     
     local exit_code=$?
     
@@ -132,20 +99,10 @@ run_main_script() {
     echo "=============================================="
     
     if [ $exit_code -eq 0 ]; then
-        print_success "Instalasi selesai!"
+        print_success "Instalasi SSH selesai!"
     else
-        print_error "Instalasi gagal dengan exit code: $exit_code"
+        print_error "Instalasi SSH gagal dengan exit code: $exit_code"
         exit $exit_code
-    fi
-}
-
-# Fungsi untuk cleanup
-cleanup() {
-    print_info "Membersihkan file temporary..."
-    
-    if [ -d "$TEMP_DIR" ]; then
-        rm -rf "$TEMP_DIR"
-        print_success "File temporary dibersihkan"
     fi
 }
 
@@ -158,9 +115,9 @@ show_info() {
     echo "=============================================="
     echo
     print_info "Script ini akan:"
-    echo "  1. Download autoscript tunneling terbaru"
-    echo "  2. Install dan konfigurasi OpenSSH"
-    echo "  3. Install dan konfigurasi Dropbear"
+    echo "  1. Install dan konfigurasi OpenSSH"
+    echo "  2. Install dan konfigurasi Dropbear"
+    echo "  3. Setup WebSocket proxy (ws-epro)"
     echo "  4. Setup multiple port untuk tunneling"
     echo "  5. Enable auto-start services"
     echo
@@ -185,26 +142,6 @@ confirm_installation() {
     esac
 }
 
-# Fungsi offline mode (jika script sudah ada)
-offline_mode() {
-    local local_script="./autoscript-tunnel.sh"
-    
-    if [ -f "$local_script" ]; then
-        print_info "Script ditemukan di direktori lokal"
-        echo -n "Gunakan script lokal? (y/n): "
-        read -r response
-        
-        case "$response" in
-            [yY]|[yY][eE][sS])
-                print_info "Menggunakan script lokal..."
-                chmod +x "$local_script"
-                bash "$local_script"
-                exit $?
-                ;;
-        esac
-    fi
-}
-
 # Fungsi utama
 main() {
     # Tampilkan informasi
@@ -212,9 +149,6 @@ main() {
     
     # Cek root
     check_root
-    
-    # Cek offline mode
-    offline_mode
     
     # Konfirmasi
     confirm_installation
@@ -227,14 +161,8 @@ main() {
     # Install dependencies
     install_dependencies
     
-    # Download script
-    download_script
-    
-    # Jalankan script utama
-    run_main_script
-    
-    # Cleanup
-    cleanup
+    # Jalankan script SSH
+    run_ssh_script
     
     echo
     print_success "=============================================="
@@ -249,9 +177,6 @@ main() {
     echo "  chmod +x test.sh && ./test.sh"
     echo
 }
-
-# Trap untuk cleanup saat script dihentikan
-trap cleanup EXIT
 
 # Jalankan fungsi utama
 main "$@"
