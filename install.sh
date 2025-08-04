@@ -45,7 +45,7 @@ check_root() {
 check_internet() {
     print_info "Mengecek koneksi internet..."
     
-    if ping -c 1 google.com >/dev/null 2>&1 || ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+    if ping -c 1 google.com >/dev/null || ping -c 1 8.8.8.8 >/dev/null; then
         print_success "Koneksi internet tersedia"
         return 0
     else
@@ -60,16 +60,16 @@ install_dependencies() {
     print_info "Menginstall dependencies..."
     
     # Update package list
-    apt update >/dev/null 2>&1
+    apt update -y
     
     # Install wget dan curl jika belum ada
     local deps_needed=""
     
-    if ! command -v wget >/dev/null 2>&1; then
+    if ! command -v wget; then
         deps_needed="$deps_needed wget"
     fi
     
-    if ! command -v curl >/dev/null 2>&1; then
+    if ! command -v curl; then
         deps_needed="$deps_needed curl"
     fi
     

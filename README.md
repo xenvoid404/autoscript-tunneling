@@ -4,70 +4,51 @@ Script otomatis untuk instalasi dan konfigurasi layanan SSH tunneling menggunaka
 
 ## 🚀 Fitur
 
-- ✅ **Instalasi Otomatis**: OpenSSH dan Dropbear dengan satu perintah
-- ✅ **Deteksi Port Conflict**: Otomatis menangani bentrokan port antara layanan
-- ✅ **Multi-Port Support**: Konfigurasi multiple port untuk setiap layanan
-- ✅ **Auto-Start**: Semua layanan aktif otomatis saat boot
-- ✅ **Backup & Restore**: Backup otomatis konfigurasi sebelum perubahan
-- ✅ **Firewall Integration**: Otomatis konfigurasi UFW jika aktif
-- ✅ **Production Ready**: Siap digunakan di VPS fresh install
+-   ✅ **Instalasi Otomatis**: OpenSSH dan Dropbear dengan satu perintah
+-   ✅ **Deteksi Port Conflict**: Otomatis menangani bentrokan port antara layanan
+-   ✅ **Multi-Port Support**: Konfigurasi multiple port untuk setiap layanan
+-   ✅ **Auto-Start**: Semua layanan aktif otomatis saat boot
+-   ✅ **Backup & Restore**: Backup otomatis konfigurasi sebelum perubahan
+-   ✅ **Firewall Integration**: Otomatis konfigurasi UFW jika aktif
+-   ✅ **Production Ready**: Siap digunakan di VPS fresh install
 
 ## 📋 Sistem yang Didukung
 
-- **Debian**: 11 (Bullseye), 12 (Bookworm)
-- **Ubuntu**: 22.04 LTS, 24.04 LTS
+-   **Debian**: 11 (Bullseye), 12 (Bookworm)
+-   **Ubuntu**: 22.04 LTS, 24.04 LTS
 
 ## 📦 Port Configuration
 
 ### OpenSSH
-- **Port utama**: 22, 80, 443, 444
-- **Fallback**: Otomatis skip port yang sudah digunakan
+
+-   **Port utama**: 22, 80, 443, 444
+-   **Fallback**: Otomatis skip port yang sudah digunakan
 
 ### Dropbear
-- **Port utama**: 90, 143, 80, 443
-- **Port alternatif**: 8080, 8443, 9090, 9443 (jika port utama tidak tersedia)
+
+-   **Port utama**: 90, 143, 80, 443
+-   **Port alternatif**: 8080, 8443, 9090, 9443 (jika port utama tidak tersedia)
 
 > **Catatan**: Script secara otomatis mendeteksi port yang sudah digunakan dan menyesuaikan konfigurasi untuk menghindari conflict.
-
-## 🛠️ Instalasi
-
-### Quick Install (Recommended)
-
-```bash
-# Download dan jalankan script
-wget https://raw.githubusercontent.com/your-repo/autoscript-tunnel.sh
-chmod +x autoscript-tunnel.sh
-sudo ./autoscript-tunnel.sh
-```
-
-### Manual Install
-
-```bash
-# Clone repository
-git clone https://github.com/your-repo/autoscript-tunnel.git
-cd autoscript-tunnel
-
-# Jalankan script
-sudo ./autoscript-tunnel.sh
-```
 
 ## 📖 Cara Penggunaan
 
 ### 1. Jalankan Script
 
 ```bash
-sudo ./autoscript-tunnel.sh
+wget -O install.sh https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install.sh && sudo bash install.sh
 ```
 
 ### 2. Tunggu Proses Instalasi
 
 Script akan otomatis:
-- Mengecek sistem operasi
-- Update package repository
-- Install OpenSSH dan Dropbear
-- Konfigurasi port dan layanan
-- Enable auto-start services
-- Tampilkan informasi koneksi
+
+-   Mengecek sistem operasi
+-   Update package repository
+-   Install OpenSSH dan Dropbear
+-   Konfigurasi port dan layanan
+-   Enable auto-start services
+-   Tampilkan informasi koneksi
 
 ### 3. Koneksi SSH
 
@@ -121,19 +102,22 @@ sudo /root/uninstall-tunnel.sh
 ## 📁 File Konfigurasi
 
 ### OpenSSH
-- **Config**: `/etc/ssh/sshd_config`
-- **Backup**: `/etc/ssh/sshd_config.backup.TIMESTAMP`
+
+-   **Config**: `/etc/ssh/sshd_config`
+-   **Backup**: `/etc/ssh/sshd_config.backup.TIMESTAMP`
 
 ### Dropbear
-- **Config**: `/etc/default/dropbear`
-- **Backup**: `/etc/default/dropbear.backup.TIMESTAMP`
-- **Host Keys**: `/etc/dropbear/`
+
+-   **Config**: `/etc/default/dropbear`
+-   **Backup**: `/etc/default/dropbear.backup.TIMESTAMP`
+-   **Host Keys**: `/etc/dropbear/`
 
 ## 🔍 Troubleshooting
 
 ### Port Already in Use
 
 Script otomatis menangani port conflict dengan:
+
 1. Deteksi port yang sudah digunakan
 2. Skip port yang tidak tersedia
 3. Gunakan port alternatif jika diperlukan
@@ -165,36 +149,39 @@ sudo ufw allow 443/tcp
 
 ### Default Security Settings
 
-- **Root Login**: Enabled (dapat diubah sesuai kebutuhan)
-- **Password Auth**: Enabled
-- **Key Auth**: Enabled
-- **Empty Passwords**: Disabled
-- **Connection Limits**: MaxSessions 10, MaxAuthTries 3
+-   **Root Login**: Enabled (dapat diubah sesuai kebutuhan)
+-   **Password Auth**: Enabled
+-   **Key Auth**: Enabled
+-   **Empty Passwords**: Disabled
+-   **Connection Limits**: MaxSessions 10, MaxAuthTries 3
 
 ### Rekomendasi Keamanan
 
 1. **Ganti Password Root**:
-   ```bash
-   passwd root
-   ```
+
+    ```bash
+    passwd root
+    ```
 
 2. **Setup SSH Key Authentication**:
-   ```bash
-   ssh-keygen -t rsa -b 4096
-   ssh-copy-id root@your-server-ip
-   ```
+
+    ```bash
+    ssh-keygen -t rsa -b 4096
+    ssh-copy-id root@your-server-ip
+    ```
 
 3. **Disable Password Auth** (setelah setup SSH key):
    Edit `/etc/ssh/sshd_config`:
-   ```
-   PasswordAuthentication no
-   ```
+
+    ```
+    PasswordAuthentication no
+    ```
 
 4. **Enable Fail2Ban**:
-   ```bash
-   apt install fail2ban
-   systemctl enable fail2ban
-   ```
+    ```bash
+    apt install fail2ban
+    systemctl enable fail2ban
+    ```
 
 ## 📊 Monitoring
 
@@ -224,6 +211,7 @@ journalctl -u dropbear -f
 ### Optimasi Koneksi
 
 Edit `/etc/ssh/sshd_config`:
+
 ```
 # Faster connection
 UseDNS no
@@ -237,6 +225,7 @@ ClientAliveCountMax 3
 ### Optimasi Dropbear
 
 Edit `/etc/default/dropbear`:
+
 ```
 # Increase receive window
 DROPBEAR_RECEIVE_WINDOW=65536
@@ -259,18 +248,19 @@ MIT License - lihat file LICENSE untuk detail lengkap.
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
+-   **Issues**: [GitHub Issues](https://github.com/xenvoid404/autoscript-tunneling/issues)
+-   **Discussions**: [GitHub Discussions](https://github.com/xenvoid404/autoscript-tunneling/discussions)
 
 ## 📝 Changelog
 
 ### v1.0.0
-- Initial release
-- Support Debian 11/12 dan Ubuntu 22/24
-- Auto port conflict detection
-- OpenSSH dan Dropbear configuration
-- Backup dan restore functionality
-- UFW firewall integration
+
+-   Initial release
+-   Support Debian 11/12 dan Ubuntu 22/24
+-   Auto port conflict detection
+-   OpenSSH dan Dropbear configuration
+-   Backup dan restore functionality
+-   UFW firewall integration
 
 ---
 
