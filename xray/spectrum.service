@@ -1,0 +1,19 @@
+[Unit]
+Description=Xray Service
+Documentation=https://github.com/xtls
+After=network.target nss-lookup.target
+
+[Service]
+User=root
+#CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+#AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+#NoNewPrivileges=true
+ExecStart=/usr/bin/xray run -config /etc/default/layers/spectrum/vmess.json
+ExecStartPost=/usr/bin/xray api adi --server=127.0.0.1:10001 /etc/default/layers/spectrum/spectrum.json
+ExecStartPost=/usr/bin/xray api ado --server=127.0.0.1:10001 /etc/default/layers/spectrum/outbounds.json
+ExecStartPost=/usr/bin/xray api adrules --server=127.0.0.1:10001 /etc/default/layers/spectrum/rules.json
+Restart=on-failure
+RestartPreventExitStatus=23
+
+[Install]
+WantedBy=multi-user.target

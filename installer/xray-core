@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Warna untuk output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Fungsi logging
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Konfigurasi Github
+GITHUB_RAW="https://raw.githubusercontent.com"
+GITHUB_USER="xenvoid404"
+GITHUB_REPO="autoscript-tunneling"
+GITHUB_REPO_BRANCH="master"
+GITHUB_RAW_REPO="${GITHUB_RAW}/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_REPO_BRANCH}"
+
+install_xray() {
+    print_info "INSTALLING XRAY..."
+    # Install xray resmi versi terbaru
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root
+    
+    # Setup konfigurasi xray custom
+    mkdir /etc/default/layers
+    curl -L -o /tmp/xray-layers.zip "${GITHUB_RAW_REPO}/xray/layers.zip"
+    unzip /tmp/xray-layers.zip -d /etc/default/layers >/dev/null 2>&1
+    
+    # Download konfigurasi networking
+    curl -sS "${GITHUB_RAW_REPO}/bin/ws-epro" -o /usr/local/bin/ws-epro && chmod +x /usr/local/bin/ws-epro
+    curl -sS "${GITHUB_RAW_REPO}/xray/tunws.conf" -o /usr/local/bin/tunws.conf && chmod 644 /usr/local/bin/tunws.conf
+    curl -sS "${GITHUB_RAW_REPO}/xray/tunws.service" -o /etc/systemd/system/tunws.service && chmod 644 /etc/systemd/system/tunws.service
+    curl -sS "${GITHUB_RAW_REPO}/server/ipserver" -o /etc/ipserver && bash /etc/ipserver
+    
+    # Buat sertifikat pem untuk haproxy
+    cat /etc/certificates/fullchain.crt /etc/certificates/private.key > /etc/certificates/full.pem
+
+    # Konfigurasi systemd
+    for svc in spectrum quantix cipheron; do
+        curl -sS "${GITHUB_RAW_REPO}/xray/${svc}.service" -o /etc/systemd/system/${svc}.service
+        chmod 644 /etc/systemd/system/${svc}.service
+    done
+
+    systemctl daemon-reload
+    systemctl enable spectrum.service --now
+    systemctl enable quantix.service --now
+    systemctl enable cipheron.service --now
+    
+    # Delete file
+    rm -rf -- "$0"
+    
+    print_success "XRAY CORE INSTALLED SUCCESSFULLY"
+}

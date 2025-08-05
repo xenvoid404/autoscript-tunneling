@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Hapus semua rules yang ada
+iptables -F
+iptables -t nat -F
+
+# Hapus semua chains yang ada
+iptables -X
+iptables -t nat -X
+
+# Set default policy
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -t nat -P PREROUTING ACCEPT
+iptables -t nat -P INPUT ACCEPT
+iptables -t nat -P OUTPUT ACCEPT
+iptables -t nat -P POSTROUTING ACCEPT
+
+# Buat custom chains untuk fail2ban
+iptables -N fail2ban_dump
+iptables -N fail2ban_rest
+
+# Izinkan port UDP/TCP tertentu
+ports=(9080 9088 2053 2052 8880 2083 2082 81 8555 8484 8443 7788 8080 2222 69 90 444 143 2202 443 80 54 55 57 58 36712)
+for port in "${ports[@]}"; do
+    iptables -A INPUT -p udp --dport $port -j ACCEPT
+    iptables -A INPUT -p tcp --dport $port -j ACCEPT
+done
+
+# Tambahkan rules fail2ban
+iptables -A INPUT -p tcp -j fail2ban_rest
+iptables -A INPUT -p tcp -j fail2ban_dump
+
+# Rules untuk FORWARD chain - Blokir traffic BitTorrent dan exploit
+bittorrent_strings=(
+    "BitTorrent" "BitTorrent protocol" "peer_id=" ".torrent" 
+    "announce.php?passkey=" "torrent" "announce" "info_hash" 
+    "/default.ida?" ".exe?/c+dir" ".exe?/c_tftp" "peer_id" 
+    "bittorrent-announce" "find_node" "get_peers" "announce_peers"
+)
+
+for string in "${bittorrent_strings[@]}"; do
+    iptables -A FORWARD -m string --string "$string" --algo bm --to 65535 -j DROP
+    iptables -A FORWARD -m string --string "$string" --algo kmp --to 65535 -j DROP
+done
+
+# Rules untuk OUTPUT chain
+iptables -A OUTPUT -p tcp -j fail2ban_rest
+iptables -A OUTPUT -p tcp -j fail2ban_dump
+
+# DNAT Rules untuk mengarahkan berbagai port UDP ke port 36712
+port_ranges=(
+    "1:21" "23:52" "54" "56:68" "70:79" "81:142" "144:442" 
+    "444:443" "445:807" "809:1193" "1195:2221" "2223:5299" 
+    "5301:5354" "5356:7099" "7101:7199" "7201:7299" "7301:7399" 
+    "7401:7499" "7501:7599" "7601:8487" "8489:9999" "10001:24999" 
+    "25001:65535"
+)
+
+for range in "${port_ranges[@]}"; do
+    iptables -t nat -A PREROUTING -i eth0 -p udp --dport $range -j DNAT --to-destination :36712
+done
+
+# MASQUERADE Rules
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 20.8.0.0/24 -o eth0 -j MASQUERADE
+
+# Simpan rules
+iptables-save >/etc/iptables/rules.v4 >/dev/null 2>&1
+iptables-save >/etc/iptables.up.rules >/dev/null 2>&1
+netfilter-persistent save >/dev/null 2>&1
+netfilter-persistent reload >/dev/null 2>&1
+systemctl enable iptables >/dev/null 2>&1 
+systemctl start iptables >/dev/null 2>&1 
+systemctl restart iptables >/dev/null 2>&1 
