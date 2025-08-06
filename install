@@ -371,27 +371,64 @@ setup_menu() {
 
 # Fungsi utama
 main() {
-    check_internet
-    check_root
-    check_virt
-    check_os
-    setup_dependencies
-    ask_domain
-    setup_environment
-    setup_utility
-    curl -sS "${GITHUB_RAW_REPO}/installer/ssh-vpn" && chmod +x ssh-vpn && ./ssh-vpn
-    curl -sS "${GITHUB_RAW_REPO}/installer/xray-core" -o xray-core && chmod +x xray-core && ./xray-core
-    curl -sS "${GITHUB_RAW_REPO}/installer/gateway" -o gateway && chmod +x xray-core && ./gateway
-    curl -sS "${GITHUB_RAW_REPO}/installer/certificate" -o certificate && chmod +x certificate && ./certificate
-    curl -sS "${GITHUB_RAW_REPO}/installer/firewall" -o firewall && chmod +x firewall && ./firewall
-    setup_menu
-    
+    check_internet || exit 1
+    check_root || exit 1
+    check_virt || exit 1
+    check_os || exit 1
+    setup_dependencies || exit 1
+    ask_domain || exit 1
+    setup_environment || exit 1
+    setup_utility || exit 1
+
+    export DOMAIN=$(cat /etc/domain)
+    if [ -z "$DOMAIN" ]; then
+        print_error "DOMAIN tidak ditemukan di /etc/domain"
+        exit 1
+    fi
+
+    # SSH-VPN
+    print_info "Menginstall SSH-VPN..."
+    curl -sSfL "${GITHUB_RAW_REPO}/installer/ssh-vpn" -o ssh-vpn
+    if [ $? -ne 0 ]; then print_error "Gagal download ssh-vpn"; exit 1; fi
+    chmod +x ssh-vpn
+    ./ssh-vpn || { print_error "ssh-vpn gagal dieksekusi"; exit 1; }
+
+    # XRAY-CORE
+    print_info "Menginstall XRAY-CORE..."
+    curl -sSfL "${GITHUB_RAW_REPO}/installer/xray-core" -o xray-core
+    if [ $? -ne 0 ]; then print_error "Gagal download xray-core"; exit 1; fi
+    chmod +x xray-core
+    ./xray-core || { print_error "xray-core gagal dieksekusi"; exit 1; }
+
+    # GATEWAY
+    print_info "Menginstall Gateway..."
+    curl -sSfL "${GITHUB_RAW_REPO}/installer/gateway" -o gateway
+    if [ $? -ne 0 ]; then print_error "Gagal download gateway"; exit 1; fi
+    chmod +x gateway
+    ./gateway || { print_error "gateway gagal dieksekusi"; exit 1; }
+
+    # CERTIFICATE
+    print_info "Menginstall Certificate..."
+    curl -sSfL "${GITHUB_RAW_REPO}/installer/certificate" -o certificate
+    if [ $? -ne 0 ]; then print_error "Gagal download certificate"; exit 1; fi
+    chmod +x certificate
+    ./certificate || { print_error "certificate gagal dieksekusi"; exit 1; }
+
+    # FIREWALL
+    print_info "Menginstall Firewall..."
+    curl -sSfL "${GITHUB_RAW_REPO}/installer/firewall" -o firewall
+    if [ $? -ne 0 ]; then print_error "Gagal download firewall"; exit 1; fi
+    chmod +x firewall
+    ./firewall || { print_error "firewall gagal dieksekusi"; exit 1; }
+
+    setup_menu || exit 1
+
     echo
     print_success "=============================================="
     print_success "          QUICK INSTALL SELESAI!"
     print_success "=============================================="
     echo
-    
+
     rm -rf -- "$0"
 }
 
