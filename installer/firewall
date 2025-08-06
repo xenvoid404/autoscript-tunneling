@@ -1,0 +1,152 @@
+#!/bin/bash
+
+# Color codes for terminal output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color (reset)
+
+# Logging functions
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Common port ranges for both IPv4 and IPv6
+PORT_RANGES=(
+    "1:21" "23:52" "54" "56:68" "70:79" "81:142" "144:442" 
+    "444:443" "445:807" "809:1193" "1195:2221" "2223:5299" 
+    "5301:5354" "5356:7099" "7101:7199" "7201:7299" "7301:7399" 
+    "7401:7499" "7501:7599" "7601:8487" "8489:9999" "10001:24999" 
+    "25001:65535"
+)
+
+# Common allowed ports
+ALLOWED_PORTS=(9080 9088 2053 2052 8880 2083 2082 81 8555 8484 8443 7788 8080 2222 69 90 444 143 2202 443 80 54 55 57 58 36712)
+
+# BitTorrent blocking strings
+BITTORRENT_STRINGS=(
+    "BitTorrent" "BitTorrent protocol" "peer_id=" ".torrent" 
+    "announce.php?passkey=" "torrent" "announce" "info_hash" 
+    "/default.ida?" ".exe?/c+dir" ".exe?/c_tftp" "peer_id" 
+    "bittorrent-announce" "find_node" "get_peers" "announce_peers"
+)
+
+configure_ipv4() {
+    print_info "Configuring IPv4 firewall rules..."
+    
+    # Flush existing rules
+    iptables -F
+    iptables -t nat -F
+    iptables -X
+    iptables -t nat -X
+
+    # Set default policies
+    iptables -P INPUT ACCEPT
+    iptables -P FORWARD ACCEPT
+    iptables -P OUTPUT ACCEPT
+    iptables -t nat -P PREROUTING ACCEPT
+    iptables -t nat -P INPUT ACCEPT
+    iptables -t nat -P OUTPUT ACCEPT
+    iptables -t nat -P POSTROUTING ACCEPT
+
+    # Create custom chains for fail2ban
+    iptables -N fail2ban_dump
+    iptables -N fail2ban_rest
+
+    # Allow specific ports
+    for port in "${ALLOWED_PORTS[@]}"; do
+        iptables -A INPUT -p udp --dport $port -j ACCEPT
+        iptables -A INPUT -p tcp --dport $port -j ACCEPT
+    done
+
+    # Add fail2ban rules
+    iptables -A INPUT -p tcp -j fail2ban_rest
+    iptables -A INPUT -p tcp -j fail2ban_dump
+
+    # Block BitTorrent and exploit traffic
+    for string in "${BITTORRENT_STRINGS[@]}"; do
+        iptables -A FORWARD -m string --string "$string" --algo bm --to 65535 -j DROP
+        iptables -A FORWARD -m string --string "$string" --algo kmp --to 65535 -j DROP
+    done
+
+    # Output chain rules
+    iptables -A OUTPUT -p tcp -j fail2ban_rest
+    iptables -A OUTPUT -p tcp -j fail2ban_dump
+
+    # DNAT Rules for port forwarding
+    for range in "${PORT_RANGES[@]}"; do
+        iptables -t nat -A PREROUTING -i eth0 -p udp --dport $range -j DNAT --to-destination :36712
+    done
+
+    # MASQUERADE Rules
+    iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s 20.8.0.0/24 -o eth0 -j MASQUERADE
+
+    # Save rules
+    iptables-save >/etc/iptables/rules.v4 >/dev/null 2>&1
+    iptables-save >/etc/iptables.up.rules >/dev/null 2>&1
+    print_success "IPv4 firewall configuration completed"
+}
+
+configure_ipv6() {
+    print_info "Configuring IPv6 firewall rules..."
+    
+    # Flush existing rules
+    ip6tables -F
+    ip6tables -t nat -F
+    ip6tables -X
+    ip6tables -t nat -X
+
+    # Set default policies
+    ip6tables -P INPUT ACCEPT
+    ip6tables -P FORWARD ACCEPT
+    ip6tables -P OUTPUT ACCEPT
+    ip6tables -t nat -P PREROUTING ACCEPT
+    ip6tables -t nat -P INPUT ACCEPT
+    ip6tables -t nat -P OUTPUT ACCEPT
+    ip6tables -t nat -P POSTROUTING ACCEPT
+
+    # Allow UDP port 36712
+    ip6tables -A INPUT -p udp --dport 36712 -j ACCEPT
+
+    # DNAT Rules for port forwarding (same ranges as IPv4)
+    for range in "${PORT_RANGES[@]}"; do
+        ip6tables -t nat -A PREROUTING -i eth0 -p udp --dport $range -j DNAT --to-destination :36712
+    done
+
+    # Save rules
+    ip6tables-save >/etc/iptables/rules.v6 >/dev/null 2>&1
+    print_success "IPv6 firewall configuration completed"
+}
+
+apply_firewall() {
+    # Apply configurations
+    configure_ipv4
+    configure_ipv6
+
+    # Reload persistent firewall
+    netfilter-persistent save >/dev/null 2>&1
+    netfilter-persistent reload >/dev/null 2>&1
+    
+    # Restart iptables service
+    systemctl restart iptables >/dev/null 2>&1
+    systemctl restart ip6tables >/dev/null 2>&1
+    
+    print_success "Firewall configuration completed successfully"
+}
+
+# Execute the firewall configuration
+apply_firewall

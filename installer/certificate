@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Warna untuk output
+# Terminal color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Fungsi logging
+# Logging functions
 print_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
@@ -24,42 +24,58 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-install_certificate() {
+# Main certificate installation function
+install_certificates() {
     clear
-    print_info "INSTALLING CERTIFICATES..."
-
-    # Buat folder cert
+    print_info "Configuring SSL/TLS certificates..."
+    
+    # Create certificate directory
     mkdir -p /etc/certificates
+    if [ $? -ne 0 ]; then
+        print_error "Failed to create certificates directory"
+        exit 1
+    fi
 
-    # Download dan install acme.sh
-    curl https://get.acme.sh | sh
+    # Install acme.sh client
+    print_info "Installing ACME client (acme.sh)..."
+    curl -s https://get.acme.sh | sh >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        print_error "Failed to install acme.sh"
+        exit 1
+    fi
 
-    # Masuk ke direktori acme.sh
-    cd ~/.acme.sh
+    # Initialize acme.sh environment
+    cd ~/.acme.sh || exit
+    print_info "Configuring certificate authority..."
+    ./acme.sh --upgrade --auto-upgrade >/dev/null 2>&1
+    ./acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1
+    ./acme.sh --register-account -m yuivpnstore@gmail.com >/dev/null 2>&1
 
-    # Set default CA ke Let's Encrypt & upgrade
-    ./acme.sh --upgrade --auto-upgrade
-    ./acme.sh --set-default-ca --server letsencrypt
+    # Issue new certificate
+    print_info "Requesting new certificate for $DOMAIN..."
+    if ! ./acme.sh --issue -d "$DOMAIN" --standalone -k ec-256 --force >/dev/null 2>&1; then
+        print_error "Certificate issuance failed"
+        exit 1
+    fi
 
-    # Daftar akun
-    ./acme.sh --register-account -m yuivpnstore@gmail.com
-
-    # Issue cert baru pakai standalone mode dan ECC
-    ./acme.sh --issue -d "$DOMAIN" --standalone -k ec-256 --force
-
-    # Install cert ke /etc/certificates
+    # Install certificates
+    print_info "Installing certificates..."
     ./acme.sh --installcert -d "$DOMAIN" \
         --fullchainpath /etc/certificates/fullchain.crt \
         --keypath /etc/certificates/private.key \
-        --ecc
+        --ecc >/dev/null 2>&1
 
-    # Set permission (biar aman)
+    # Secure certificate files
     chmod 600 /etc/certificates/*
     chown nobody:nogroup /etc/certificates/*
-    
-    # Delete File
-    rm -rf .acme.sh >/dev/null 2>&1
-    rm -rf -- "$0"
 
-    print_ok "CERTIFICATES INSTALLED"
+    # Cleanup
+    print_info "Performing cleanup..."
+    rm -rf ~/.acme.sh >/dev/null 2>&1
+    
+    print_success "SSL/TLS certificates successfully configured for $DOMAIN"
+    rm -f "$0"
 }
+
+# Execute main function
+install_certificates

@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Quick Install Script untuk Autoscript Tunneling
-# Script untuk download dan install autoscript tunneling
+# Quick Install Script for Tunneling Autoscript
+# Script to download and install tunneling autoscript
 # Quick Install Command: apt update -y && apt install -y curl jq wget screen build-essential && curl -sSfL https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install -o install && chmod +x install && screen -S yuipedia ./install
-# Jika VPS Terputus ketika sedang menginstall, masuk kembali dan jalankan command: screen -r yuipedia
+# If the VPS connection drops during installation, reconnect and run: screen -r yuipedia
 
-# Warna untuk output
+# Color codes for terminal output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # No Color (reset)
 
-# Fungsi logging
+# Logging functions
 print_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
@@ -29,14 +29,14 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Konfigurasi Github
+# Github Configuration
 GITHUB_RAW="https://raw.githubusercontent.com"
 GITHUB_USER="xenvoid404"
 GITHUB_REPO="autoscript-tunneling"
 GITHUB_REPO_BRANCH="master"
 GITHUB_RAW_REPO="${GITHUB_RAW}/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_REPO_BRANCH}"
 
-# Konfigurasi Cloudflare
+# Cloudflare Configuration
 CF_EMAIL="bodoaraimu@gmail.com"
 CF_API="2fd2aaa4b4f93a167dfbfa9e0fb1db461b2cd"
 CF_ZONE="12547556cdac33b9b581059255ee574f"
@@ -45,42 +45,54 @@ CF_ZONE="12547556cdac33b9b581059255ee574f"
 IP=$(curl -s ifconfig.me)
 touch /etc/domain
 
-# Fungsi untuk mengecek apakah script dijalankan sebagai root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        print_error "Script ini harus dijalankan sebagai root!"
-        rm -- "$0"
-        exit 1
-    fi
-}
-
-# Fungsi untuk mengecek virtualisasi
-check_virt() {
-    if [[ "$(systemd-detect-virt 2>/dev/null)" == "openvz" ]] || grep -q openvz /proc/user_beancounters; then
-        echo "ERROR: OpenVZ tidak didukung"
-        rm -rf -- "$0"
-        exit 1
-    fi
-}
-
-# Fungsi untuk mengecek koneksi internet
+# Function to check internet connection
 check_internet() {
-    print_info "Mengecek koneksi internet..."
+    print_info "Checking internet connection..."
+    sleep 1
     
     if ping -c 1 google.com >/dev/null || ping -c 1 8.8.8.8 >/dev/null; then
-        print_success "Koneksi internet tersedia"
-        return 0
+        print_success "Internet connection is available"
     else
-        print_error "Tidak ada koneksi internet"
-        print_info "Pastikan server terhubung ke internet untuk download script"
-        rm -- "$0"
-        return 1
+        print_error "No internet connection"
+        print_info "Please make sure the server is connected to the internet to download the script"
+        exit 1
+        rm -rf -- "$0"
     fi
 }
 
-# Fungsi untuk mengecek distribusi OS
+# Check if script is running with root privileges
+check_root() {
+    print_info "Checking user root..."
+    sleep 1
+    
+    if [[ $EUID -ne 0 ]]; then
+        print_error "This script must be run as root!"
+        exit 1
+        rm -rf -- "$0"
+    else
+        print_success "Root privileges confirmed"
+    fi
+}
+
+# Check virtualization type (OpenVZ not supported)
+check_virt() {
+    print_info "Checking virtualization environment..."
+    sleep 1
+    
+    if [[ "$(systemd-detect-virt 2>/dev/null)" == "openvz" ]] || grep -q openvz /proc/user_beancounters; then
+        print_error "Unsupported virtualization: OpenVZ detected"
+        print_info "This script requires KVM/Xen or baremetal environment"
+        exit 1
+        rm -rf -- "$0"
+    else
+        print_success "Virtualization check passed"
+    fi
+}
+
+# Check supported operating system distribution
 check_os() {
-    print_info "Mengecek sistem operasi..."
+    print_info "Detecting operating system..."
+    sleep 1
     
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
@@ -88,207 +100,299 @@ check_os() {
         VERSION=$VERSION_ID
         VERSION_MAJOR=$(echo "$VERSION" | cut -d'.' -f1)
     else
-        print_error "Operating System tidak terdeteksi"
-        rm -rf -- "$0"
+        print_error "Failed to detect operating system"
         exit 1
+        rm -rf -- "$0"
     fi
 
     case "$OS" in
         "ubuntu")
             if [[ "$VERSION_MAJOR" -ge 22 ]]; then
-                print_success "Sistem operasi didukung: Ubuntu $VERSION"
+                print_success "Supported OS detected: Ubuntu $VERSION"
             else
-                print_error "Versi Ubuntu tidak didukung! Minimal Ubuntu 22+"
-                rm -rf -- "$0"
+                print_error "Unsupported Ubuntu version! Minimum required: Ubuntu 22+"
                 exit 1
+                rm -rf -- "$0"
             fi
             ;;
         "debian")
             if [[ "$VERSION_MAJOR" -ge 11 ]]; then
-                print_success "Sistem operasi didukung: Debian $VERSION"
+                print_success "Supported OS detected: Debian $VERSION"
             else
-                print_error "Versi Debian tidak didukung! Minimal Debian 11+"
-                rm -rf -- "$0"
+                print_error "Unsupported Debian version! Minimum required: Debian 11+"
                 exit 1
+                rm -rf -- "$0"
             fi
             ;;
         *)
-            print_error "Sistem operasi tidak didukung: $OS"
-            print_info "Script ini hanya untuk Ubuntu 22+ dan Debian 11+"
-            rm -rf -- "$0"
+            print_error "Unsupported operating system: $OS"
+            print_info "This script only supports Ubuntu 22+ and Debian 11+"
             exit 1
+            rm -rf -- "$0"
             ;;
     esac
 }
 
-# First Setup Installation
-first_setup() {
-    print_info "Setup Environment for First Installation..."
-    sleep 2
-    
-    # Set Timezone
-    timedatectl set-timezone Asia/Jakarta
-    # Setup sshd_config
-    curl -sSfL "${GITHUB_RAW_REPO}/ssh/sshd_config" -o /etc/ssh/sshd_config && chmod 644 /etc/ssh/sshd_config
-    # Setup common-password
-    curl -sSfL "${GITHUB_RAW_REPO}/ssh/common-password" -o /etc/pam.d/common-password && chmod 644 /etc/pam.d/common-password
-    # Setup Banner Ssh
-    curl -sSfL "${GITHUB_RAW_REPO}/ssh/banner.com" -o /etc/banner.com && chmod 600 /etc/banner.com
-    # Setup Neofetch
-    curl -sSfL "${GITHUB_RAW_REPO}/bin/neofetch" -o /usr/local/bin/neofetch && chmod +x /usr/local/bin/neofetch
-    cat > /root/.profile <<-END
-~/.profile: executed by Bourne-compatible login shells.
-if [ "\$BASH" ]; then
-    if [ -f ~/.bashrc ]; then
-        . ~/.bashrc
-    fi
-fi
-
-mesg n || true
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-neofetch
-\$WEB_SERVER
-END
-
-    # Setup iptables
-    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
-    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-}
-
-# Setup Dependencies
+# Install and configure system dependencies
 setup_dependencies() {
+    # Remove unnecessary packages
     apt remove --purge -y man-db apache2 ufw exim4 firewalld snapd*
     clear
-    print_info "INSTALLING REQUIRED DEPENDENCIES..."
-    sleep 2
-    # Disable IPV6
+    
+    print_info "Installing required dependencies..."
+    sleep 1
+    
+    # Disable IPv6
     sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
-    sysctl -w net.ipv6.conf.default.disable_ipv6=1  >/dev/null 2>&1
+    sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
+    
+    # Update system and install packages
     apt install software-properties-common -y
     apt update && apt upgrade -y
-    apt install -y nginx zip unzip pwgen openssl netcat bash-completion  \
-    socat xz-utils apt-transport-https dnsutils socat \
-    tar ruby p7zip-full python3-pip haproxy libc6  \
-    msmtp-mta ca-certificates bsd-mailx iptables iptables-persistent netfilter-persistent \
-    net-tools openvpn easy-rsa python3-certbot-nginx p7zip-full tuned fail2ban
+    apt install -y \
+        nginx dropbear zip unzip pwgen openssl netcat bash-completion \
+        socat xz-utils apt-transport-https dnsutils \
+        tar ruby p7zip-full python3-pip haproxy libc6 \
+        msmtp-mta ca-certificates bsd-mailx iptables iptables-persistent \
+        netfilter-persistent net-tools openvpn easy-rsa \
+        python3-certbot-nginx p7zip-full tuned fail2ban
+    
+    # Clean up
     apt autoremove -y
     apt clean
     
-    print_success "REQUIRED DEPENDENCIES INSTALLED SUCCESSFULLY"
+    # Install gotop monitoring tool
+    print_info "Installing system monitor..."
+    curl -sSfL -o gotop.tgz https://github.com/xxxserxxx/gotop/releases/download/v4.2.0/gotop_v4.2.0_linux_amd64.tgz
+    tar -xzf gotop.tgz
+    mv gotop /usr/local/bin
+    rm gotop.tgz
+    
+    print_success "All dependencies installed and configured successfully"
 }
 
-# Buat random string untuk subdomain
-generate_random_string() {
-    LENGTH=4
-    CHAR_SET="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    RAND_STRING=$(LC_CTYPE=C tr -dc "$CHAR_SET" < /dev/urandom | head -c "$LENGTH")
-    echo "$RAND_STRING"
-}
-
-# Tanya apakah user punya domain yang sudah di pointing ke ip vps
+# Prompt user for domain ownership
 ask_domain() {
     while true; do
-        read -rp "Do you have a Domain? (y/n): " ANS
-        case "$ANS" in
-            y|Y)
-                check_domain
+        read -rp "Do you already own a domain name? (y/n): " ANSWER
+        case "$ANSWER" in
+            [yY]|[yY][eE][sS])
+                validate_domain
                 break
                 ;;
             *)
-                print_info "It's okay, we'll set up a free domain for you."
+                print_info "No problem, we'll configure a free subdomain for you."
                 sleep 2
-                request_domain
+                setup_cloudflare_domain
                 break
                 ;;
         esac
     done
 }
 
-# Cek domain apakah mengarah ke ip vps
-check_domain() {
+# Verify domain DNS resolution matches server IP
+validate_domain() {
     clear
-    read -rp "${YELLOW}Enter Domain Name: " DOMAIN
-    IP_DOMAIN=$(host -t A $DOMAIN | awk '{print $4}')
-    if [[ "$IP_DOMAIN" != "$IP" ]]; then
-        print_error "Domain name not verified or A record is not published."
-        rm -rf -- "$0"
-        sleep 2
+    read -rp "${YELLOW}Enter your domain name (example.com): " DOMAIN
+    
+    # Remove any http:// or https:// prefix
+    DOMAIN=$(echo "$DOMAIN" | sed -E 's/^https?:\/\///')
+    
+    print_info "Verifying DNS records for $DOMAIN..."
+    local DOMAIN_IP=$(dig +short A "$DOMAIN" | head -n1)
+    
+    if [[ "$DOMAIN_IP" != "$SERVER_IP" ]]; then
+        print_error "Domain verification failed!"
+        print_info "The domain $DOMAIN does not resolve to this server's IP ($SERVER_IP)"
+        print_info "Please update your DNS A record before continuing"
+        rm -f "$0"
         exit 1
     else
-        clear
-        sleep 2
-        print_success "Domain added successfully"
+        print_success "Domain verified successfully"
         echo "$DOMAIN" > /etc/domain
-        export DOMAIN=$DOMAIN
-        sleep 1
+        export DOMAIN
+        sleep 2
         clear
     fi
 }
 
-# Added domain to Cloudflare
-request_domain() {
+# Configure Cloudflare DNS record for free subdomain
+setup_cloudflare_domain() {
     clear
-    print_info "Request new domain for ${IP}"
-    SUBDOMAIN=$(generate_random_string)
-    RETRY=0
-    MAX_RETRY=3
-    while [ "$RETRY" -lt "$MAX_RETRY" ]; do
-        # Add the subdomain to Cloudflare 
-        RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE}/dns_records" \
-        -H "X-Auth-Email: ${CF_EMAIL}" \
-        -H "X-Auth-Key: ${CF_API}" \
-        -H "Content-Type: application/json" \
-        --data '{
-        "type": "A",
-        "name": "'"${SUBDOMAIN}"'",
-        "content": "'"${IP}"'",
-        "ttl": 1,
-        "proxied": false
-        }')
+    print_info "Configuring Cloudflare DNS for ${SERVER_IP}"
+    
+    local SUBDOMAIN=$(generate_random_string)
+    local MAX_ATTEMPTS=3
+    local ATTEMPT=0
+    local SUCCESS=false
+    
+    while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ] && [ "$SUCCESS" = false ]; do
+        ATTEMPT=$((ATTEMPT+1))
+        print_info "Attempt $ATTEMPT of $MAX_ATTEMPTS to create DNS record..."
         
-        # Cek response from Cloudflare
-        STATUS=$(echo "$RESPONSE" | jq -r '.success')
-        if [[ "$STATUS" == 'true' ]]; then
-            print_success "Added domain for your vps success!"
-            sleep 2
+        local RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records" \
+            -H "X-Auth-Email: ${CF_ACCOUNT_EMAIL}" \
+            -H "X-Auth-Key: ${CF_API_KEY}" \
+            -H "Content-Type: application/json" \
+            --data '{
+                "type": "A",
+                "name": "'"${SUBDOMAIN}"'",
+                "content": "'"${SERVER_IP}"'",
+                "ttl": 300,
+                "proxied": false
+            }')
+        
+        if echo "$RESPONSE" | jq -e '.success == true' >/dev/null; then
+            SUCCESS=true
+            DOMAIN="${SUBDOMAIN}.${CF_ROOT_DOMAIN}"
             echo "$DOMAIN" > /etc/domain
-            export DOMAIN=$DOMAIN
-            print_info "Domain anda: $DOMAIN"
-            sleep 2
-            break
+            export DOMAIN
+            
+            print_success "Successfully created DNS record for ${DOMAIN}"
+            print_info "Your new domain: ${GREEN}${DOMAIN}${NC}"
+            sleep 3
         else
-            print_error "Add subdomain to Cloudflare failed. Retrying..."
+            local ERROR=$(echo "$RESPONSE" | jq -r '.errors[0].message')
+            print_warning "DNS record creation failed (Attempt ${ATTEMPT}/${MAX_ATTEMPTS})"
+            print_info "Cloudflare API error: ${ERROR}"
             sleep 2
-            RETRY=$((RETRY + 1))
-            clear
         fi
     done
-    
-    if [[ "$RETRY" -eq "$MAX_RETRY" ]]; then
-        print_error "Max retry reached, failed add subdomain to cloudflare."
-        sleep 2
+
+    if [ "$SUCCESS" = false ]; then
+        print_error "Failed to configure Cloudflare DNS after ${MAX_ATTEMPTS} attempts"
+        print_info "Please try again later or configure your own domain"
+        exit 1
     fi
+}
+
+# Configure system environment settings
+setup_environment() {
+    # Set system timezone
+    print_info "Configuring system timezone..."
+    sleep 1
+    timedatectl set-timezone Asia/Jakarta
+    
+    # Configure swap memory
+    print_info "Setting up swap memory..."
+    if [ ! -f /swapfile ]; then
+        dd if=/dev/zero of=/swapfile bs=1M count=1024
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+        print_success "1GB swap memory configured successfully"
+    else
+        print_warning "Swap file already exists, skipping creation"
+    fi
+    
+    # Configure iptables persistence
+    print_info "Configuring firewall persistence..."
+    debconf-set-selections <<EOF
+iptables-persistent iptables-persistent/autosave_v4 boolean true
+iptables-persistent iptables-persistent/autosave_v6 boolean true
+EOF
+    
+    # Tune network performance
+    print_info "Optimizing network performance..."
+    tuned-adm profile network-latency
+    print_success "Network latency profile activated"
+    
+    print_success "System environment configured successfully"
+}
+
+# Configure system utilities and SSH settings
+setup_utility() {
+    print_info "Configuring SSH server settings..."
+    sleep 1
+    
+    # Download and apply SSH configuration files
+    print_info "Applying secure SSH configuration..."
+    curl -sSfL "${GITHUB_RAW_REPO}/ssh/sshd_config" -o /etc/ssh/sshd_config && chmod 644 /etc/ssh/sshd_config
+    curl -sSfL "${GITHUB_RAW_REPO}/ssh/common-password" -o /etc/pam.d/common-password && chmod 644 /etc/pam.d/common-password
+    curl -sSfL "${GITHUB_RAW_REPO}/ssh/banner.com" -o /etc/banner.com && chmod 600 /etc/banner.com
+    
+    print_success "SSH security configuration applied successfully"
+    
+    # Install and configure system utilities
+    print_info "Setting up system utilities..."
+    sleep 1
+    
+    # Install Neofetch system information tool
+    curl -sSfL "${GITHUB_RAW_REPO}/bin/neofetch" -o /usr/local/bin/neofetch && chmod +x /usr/local/bin/neofetch
+    
+    # Configure user profile with Neofetch display
+    cat > /root/.profile <<-END
+# ~/.profile: executed by Bourne-compatible login shells
+
+if [ "\$BASH" ]; then
+    if [ -f ~/.bashrc ]; then
+        . ~/.bashrc
+    fi
+fi
+
+# Disable message-of-the-day
+mesg n || true
+
+# Set system timezone
+ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+
+# Display system information on login
+neofetch
+
+# Show web server status if available
+\$WEB_SERVER
+END
+
+    print_success "System utilities configured successfully"
+}
+
+# Generate random string for subdomain
+generate_random_string() {
+    local LENGTH=4
+    local CHAR_SET="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    local RAND_STRING=$(LC_CTYPE=C tr -dc "$CHAR_SET" < /dev/urandom | head -c "$LENGTH")
+    echo "$RAND_STRING"
+}
+
+# Setup menu
+setup_menu() {
+    print_info "Setup menu..."
+    sleep 1
+    
+    curl -sS "${GITHUB_RAW_REPO}/config/menu.zip" -o /tmp/menu-master.zip >/dev/null
+    mkdir /tmp/menu
+    unzip /tmp/menu-master.zip -d /tmp/menu/ >/dev/null
+    chmod +x /tmp/menu/*
+    mv /tmp/menu/* /usr/local/bin/
+    
+    print_success "Setup menu successfully"
 }
 
 # Fungsi utama
 main() {
+    check_internet
     check_root
     check_virt
-    check_internet
     check_os
-    first_setup
     setup_dependencies
     ask_domain
-    curl -sS "${GITHUB_RAW_REPO}/installer/certificate" -o certificate && chmod +x certificate && ./certificate
-    curl -sS "${GITHUB_RAW_REPO}/installer/xray-core" -o xray-core && chmod +x xray-core && ./xray-core
-    curl -sS "${GITHUB_RAW_REPO}/installer/openvpn" -o openvpn && chmod +x openvpn && ./openvpn
+    setup_environment
+    setup_utility
     curl -sS "${GITHUB_RAW_REPO}/installer/ssh-vpn" && chmod +x ssh-vpn && ./ssh-vpn
+    curl -sS "${GITHUB_RAW_REPO}/installer/xray-core" -o xray-core && chmod +x xray-core && ./xray-core
+    curl -sS "${GITHUB_RAW_REPO}/installer/gateway" -o gateway && chmod +x xray-core && ./gateway
+    curl -sS "${GITHUB_RAW_REPO}/installer/certificate" -o certificate && chmod +x certificate && ./certificate
+    curl -sS "${GITHUB_RAW_REPO}/installer/firewall" -o firewall && chmod +x firewall && ./firewall
+    setup_menu
     
     echo
     print_success "=============================================="
     print_success "          QUICK INSTALL SELESAI!"
     print_success "=============================================="
     echo
+    
+    rm -rf -- "$0"
 }
 
 # Jalankan fungsi utama
