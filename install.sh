@@ -5,19 +5,19 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 print_success() {
-	echo -e "${GREEN}[SUCCESS] $1"
+	echo -e "${GREEN}[SUCCESS] $1${NC}"
 }
 
 print_error() {
-	echo -e "${RED}[ERROR] $1"
+	echo -e "${RED}[ERROR] $1${NC}"
 }
 
 print_info() {
-	echo -e "${BLUE}[INFO] $1"
+	echo -e "${BLUE}[INFO] $1${NC}"
 }
 
 print_warning() {
-	echo -e "${YELLOW}[WARNING] $1"
+	echo -e "${YELLOW}[WARNING] $1${NC}"
 }
 
 # Github Configuration
@@ -114,30 +114,45 @@ setup_dependencies() {
 	sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
 
 	# Update system dan instalasi packages
-	apt update && apt upgrade -y
 	apt install software-properties-common -y
-	apt install curl jq wget screen build-essential -y
-	apt install zip unzip nginx -y
+	apt install zip unzip nginx libnginx-mod-stream -y
 }
 
 setup_nginx() {
-  print_info "Setup nginx..."
-  sleep 1
-  
-  systemctl stop nginx
-  rm -rf /etc/nginx/*
-  
-  mkdir -p /tmp/nginx
-  curl -sS "${GITHUB_RAW}/etc/nginx/conf.zip" -o /tmp/nginx/conf.zip
-  unzip /tmp/nginx/conf.zip
-  rm -rf /tmp/nginx/conf.zip
-  mv /tmp/nginx/* /etc/nginx/
-  chown -R root:root /etc/nginx
-  chmod -R 755 /etc/nginx
-  
-  nginx -t && systemctl status nginx
-  systemctl restart nginx
-  print_success "Instalasi nginx success"
+	print_info "Setup nginx..."
+	sleep 1
+
+	# Matikam nginx & hapus konfigurasi bawaan
+	systemctl stop nginx
+	rm -rf /etc/nginx/*
+
+	# Download konfigurasi custom
+	curl -sS "${GITHUB_RAW}/etc/nginx/conf.zip" -o /tmp/nginx_conf.zip
+	if [[ ! -s "/tmp/nginx_conf.zip" ]]; then
+		print_error "Download kofigurasi nginx gagal"
+		exit 1
+	fi
+
+	print_info "Extracting nginx config..."
+	unzip -qo /tmp/nginx_conf.zip -d /etc/nginx/
+	rm -rf /tmp/nginx_conf.zip
+	
+	# Symlink modules
+	mkdir -p /etc/nginx/modules-enabled
+	ln -sf /usr/share/nginx/modules-available/*.conf /etc/nginx/modules-enabled/
+	
+	# Set user & permission
+	chown -R root:root /etc/nginx
+	chmod -R 755 /etc/nginx
+
+	if nginx -t >/dev/null 2>&1; then
+		systemctl restart nginx
+		print_success "Instalasi nginx success"
+	else
+		print_error "Konfigurasi nginx error"
+		nginx -t
+		exit 1
+	fi
 }
 
 main() {
@@ -146,6 +161,7 @@ main() {
 	check_virt
 	check_os
 	setup_dependencies
+	setup_nginx
 }
 
 main "$@"
