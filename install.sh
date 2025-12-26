@@ -139,7 +139,7 @@ setup_nginx() {
 	
 	# Symlink modules
 	mkdir -p /etc/nginx/modules-enabled
-	ln -sf /usr/share/nginx/modules-available/*.conf /etc/nginx/modules-enabled/
+	ln -sf /usr/share/nginx/modules-available/mod-stream.conf /etc/nginx/modules-enabled/50-mod-stream.conf
 	
 	# Set user & permission
 	chown -R root:root /etc/nginx
@@ -155,6 +155,37 @@ setup_nginx() {
 	fi
 }
 
+setup_dropbear() {
+  print_info "Setup dropbear..."
+  sleep 1
+  
+  # Install & stop dripbear bawaan
+  apt install dropbear -y
+  systemctl stop dropbear
+  
+  # Download binary dropbear 2019 (by default)
+  curl -sS "${GITHUB_RAW}/usr/sbin/dropbear/dropbear-2019" -o /usr/sbin/dropbear
+  if [[ ! -s "/usr/sbin/dropbear" ]]; then
+    print_error "Gagal download binary dropbear"
+    apt install --reinstall dropbear -y
+  else
+    chmod +x /usr/sbin/dropbear
+    print_success "Dropbear installed successfully"
+  fi
+  
+  curl -sS "${GITHUB_RAW}/etc/default/dropbear" -o /etc/default/dropbear
+  curl -sS "${GITHUB_RAW}/etc/issue.net" -o /etc/issue.net
+  systemctl restart dropbear
+  
+  # Validasi port dropbear
+  if netstat -tunlp | grep :90 >/dev/null; then
+    print_success "Dropbear running (sesuai config file)"
+  else 
+    print_error "Dropbear gagal start"
+    exit 1
+  fi
+}
+
 main() {
 	check_internet
 	check_root
@@ -162,6 +193,7 @@ main() {
 	check_os
 	setup_dependencies
 	setup_nginx
+	setup_dropbear
 }
 
 main "$@"
