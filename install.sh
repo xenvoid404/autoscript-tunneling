@@ -115,7 +115,7 @@ setup_dependencies() {
 
 	# Update system dan instalasi packages
 	apt install software-properties-common -y
-	apt install zip unzip nginx libnginx-mod-stream -y
+	apt install net-tools zip unzip nginx libnginx-mod-stream -y
 }
 
 setup_nginx() {
@@ -136,11 +136,22 @@ setup_nginx() {
 	print_info "Extracting nginx config..."
 	unzip -qo /tmp/nginx_conf.zip -d /etc/nginx/
 	rm -rf /tmp/nginx_conf.zip
-	
+
 	# Symlink modules
 	mkdir -p /etc/nginx/modules-enabled
 	ln -sf /usr/share/nginx/modules-available/mod-stream.conf /etc/nginx/modules-enabled/50-mod-stream.conf
-	
+
+	# Cloudflare real ip
+	echo "# Cloudflare Real IP" >/etc/nginx/conf.d/yixian.conf
+	for ip in $(curl -s https://www.cloudflare.com/ips-v4); do
+		echo "set_real_ip_from $ip;" >>/etc/nginx/conf.d/yixian.conf
+	done
+	for ip in $(curl -s https://www.cloudflare.com/ips-v6); do
+		echo "set_real_ip_from $ip;" >>/etc/nginx/conf.d/yixian.conf
+	done
+	echo "real_ip_header X-Forwarded-For;" >>/etc/nginx/conf.d/yixian.conf
+	echo "real_ip_recursive on;" >>/etc/nginx/conf.d/yixian.conf
+
 	# Set user & permission
 	chown -R root:root /etc/nginx
 	chmod -R 755 /etc/nginx
@@ -156,34 +167,56 @@ setup_nginx() {
 }
 
 setup_dropbear() {
-  print_info "Setup dropbear..."
-  sleep 1
-  
-  # Install & stop dripbear bawaan
-  apt install dropbear -y
-  systemctl stop dropbear
-  
-  # Download binary dropbear 2019 (by default)
-  curl -sS "${GITHUB_RAW}/usr/sbin/dropbear/dropbear-2019" -o /usr/sbin/dropbear
-  if [[ ! -s "/usr/sbin/dropbear" ]]; then
-    print_error "Gagal download binary dropbear"
-    apt install --reinstall dropbear -y
-  else
-    chmod +x /usr/sbin/dropbear
-    print_success "Dropbear installed successfully"
-  fi
-  
-  curl -sS "${GITHUB_RAW}/etc/default/dropbear" -o /etc/default/dropbear
-  curl -sS "${GITHUB_RAW}/etc/issue.net" -o /etc/issue.net
-  systemctl restart dropbear
-  
-  # Validasi port dropbear
-  if netstat -tunlp | grep :90 >/dev/null; then
-    print_success "Dropbear running (sesuai config file)"
-  else 
-    print_error "Dropbear gagal start"
-    exit 1
-  fi
+	print_info "Setup dropbear..."
+	sleep 1
+
+	# Install & stop dripbear bawaan
+	apt install dropbear -y
+	systemctl stop dropbear
+
+	# Download binary dropbear 2019 (by default)
+	curl -sS "${GITHUB_RAW}/usr/sbin/dropbear/dropbear-2019" -o /usr/sbin/dropbear
+	if [[ ! -s "/usr/sbin/dropbear" ]]; then
+		print_error "Gagal download binary dropbear"
+		apt install --reinstall dropbear -y
+	else
+		chmod +x /usr/sbin/dropbear
+		print_success "Dropbear installed successfully"
+	fi
+
+	curl -sS "${GITHUB_RAW}/etc/default/dropbear" -o /etc/default/dropbear
+	curl -sS "${GITHUB_RAW}/etc/issue.net" -o /etc/issue.net
+	systemctl restart dropbear
+
+	# Validasi port dropbear
+	if netstat -tunlp | grep :90 >/dev/null; then
+		print_success "Dropbear running (sesuai config file)"
+	else
+		print_error "Dropbear gagal start"
+		exit 1
+	fi
+}
+
+setup_wsepro() {
+	print_info "Setup WS-ePro..."
+	sleep 1
+
+	curl -sS "${GITHUB_RAW}/usr/sbin/ws-epro" -o /usr/sbin/ws-epro
+	chmod +x /usr/sbin/ws-epro
+
+	curl -sS "${GITHUB_RAW}/usr/sbin/tunws.conf" -o /usr/sbin/tunws.conf
+	curl -sS "${GITHUB_RAW}/etc/systemd/system/tunws.service" -o /etc/systemd/system/tunws.service
+
+	systemctl daemon-reload
+	systemctl enable tunws
+	systemctl restart tunws
+
+	if netstat -tunlp | grep :1230 >/dev/null; then
+		print_success "WS ePro berjalan di port 1230"
+	else
+		print_error "WS ePro gagal berjalan"
+		exit 1
+	fi
 }
 
 main() {
@@ -194,6 +227,7 @@ main() {
 	setup_dependencies
 	setup_nginx
 	setup_dropbear
+	setup_wsepro
 }
 
 main "$@"
