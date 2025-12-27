@@ -115,7 +115,7 @@ setup_dependencies() {
 
 	# Update system dan instalasi packages
 	apt install software-properties-common -y
-	apt install net-tools zip unzip nginx libnginx-mod-stream -y
+	apt install net-tools zip unzip nginx libnginx-mod-stream python3 python3-pip -y
 }
 
 setup_nginx() {
@@ -166,6 +166,32 @@ setup_nginx() {
 	fi
 }
 
+setup_websocket_service() {
+	print_info "Setup websocket..."
+	sleep 1
+
+	curl -sS "${GITHUB_RAW}/usr/sbin/sochs.py" -o /usr/sbin/sochs.py
+	curl -sS "${GITHUB_RAW}/usr/sbin/ws-epro" -o /usr/sbin/ws-epro
+	chmod +x /usr/sbin/ws-epro
+
+	curl -sS "${GITHUB_RAW}/usr/sbin/tunws.conf" -o /usr/sbin/tunws.conf
+	curl -sS "${GITHUB_RAW}/etc/systemd/system/tunws.service" -o /etc/systemd/system/tunws.service
+	curl -sS "${GITHUB_RAW}/etc/systemd/system/tunws@.service" -o /etc/systemd/system/tunws@.service
+
+	systemctl daemon-reload
+	systemctl enable tunws
+	systemctl enable tunws@sochs
+	systemctl restart tunws
+	systemctl restart tunws@sochs
+
+	if netstat -tunlp | grep :1230 >/dev/null; then
+		print_success "WS ePro berjalan di port 1230"
+	else
+		print_error "WS ePro gagal berjalan"
+		exit 1
+	fi
+}
+
 setup_dropbear() {
 	print_info "Setup dropbear..."
 	sleep 1
@@ -197,28 +223,6 @@ setup_dropbear() {
 	fi
 }
 
-setup_wsepro() {
-	print_info "Setup WS-ePro..."
-	sleep 1
-
-	curl -sS "${GITHUB_RAW}/usr/sbin/ws-epro" -o /usr/sbin/ws-epro
-	chmod +x /usr/sbin/ws-epro
-
-	curl -sS "${GITHUB_RAW}/usr/sbin/tunws.conf" -o /usr/sbin/tunws.conf
-	curl -sS "${GITHUB_RAW}/etc/systemd/system/tunws.service" -o /etc/systemd/system/tunws.service
-
-	systemctl daemon-reload
-	systemctl enable tunws
-	systemctl restart tunws
-
-	if netstat -tunlp | grep :1230 >/dev/null; then
-		print_success "WS ePro berjalan di port 1230"
-	else
-		print_error "WS ePro gagal berjalan"
-		exit 1
-	fi
-}
-
 main() {
 	check_internet
 	check_root
@@ -226,8 +230,8 @@ main() {
 	check_os
 	setup_dependencies
 	setup_nginx
+	setup_websocket_service
 	setup_dropbear
-	setup_wsepro
 }
 
 main "$@"
