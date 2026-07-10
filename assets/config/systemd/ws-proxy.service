@@ -1,0 +1,14 @@
+[Unit]
+Description=Websocket Python3
+Documentation=https://nekopay.web.id
+After=network.target nss-lookup.target dropbear.service
+
+[Service]
+User=root
+Type=simple
+Restart=on-failure
+RestartSec=3
+ExecStart=/usr/bin/python3 /usr/local/bin/ws-proxy.py -b 127.0.0.1 -p __WS_PORT__
+
+[Install]
+WantedBy=multi-user.target
