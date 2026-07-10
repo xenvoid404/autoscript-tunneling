@@ -12,9 +12,9 @@
 
 #Include /etc/ssh/sshd_config.d/*.conf
 
-Port __OPENSSH_PORT_1__
-Port __OPENSSH_PORT_2__
-Port __OPENSSH_PORT_3__
+Port 22
+Port 2222
+Port 444
 #AddressFamily any
 #ListenAddress 0.0.0.0
 #ListenAddress ::
@@ -106,7 +106,7 @@ PrintMotd no
 #VersionAddendum none
 
 # no default banner path
-Banner __SSH_BANNER_PATH__
+Banner /etc/banner.why
 
 # Allow client to pass locale environment variables
 #AcceptEnv LANG LC_*

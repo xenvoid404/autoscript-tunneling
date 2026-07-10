@@ -8,7 +8,7 @@ User=root
 Type=simple
 Restart=on-failure
 RestartSec=3
-ExecStart=/usr/bin/python3 /usr/local/bin/ws-proxy.py -b 127.0.0.1 -p __WS_PORT__
+ExecStart=/usr/bin/python3 /usr/local/bin/ws-proxy.py -b 127.0.0.1 -p 1230
 
 [Install]
 WantedBy=multi-user.target

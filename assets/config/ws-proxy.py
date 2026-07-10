@@ -7,11 +7,11 @@ import time
 import getopt
 
 LISTENING_ADDR = '127.0.0.1'
-LISTENING_PORT = __WS_PORT__
+LISTENING_PORT = 1230
 PASS = ''
 BUFLEN = 4096 * 4
 TIMEOUT = 60
-DEFAULT_HOST = '127.0.0.1:__DROPBEAR_PORT_1__'
+DEFAULT_HOST = '127.0.0.1:90'
 RESPONSE = (
     'HTTP/1.1 101 Switching Protocol\r\n'
     'Upgrade: websocket\r\n'
