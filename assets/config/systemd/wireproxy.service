@@ -1,0 +1,13 @@
+[Unit]
+Description=WireProxy for WARP
+After=network.target
+Documentation=https://github.com/fscarmen/warp-sh
+Documentation=https://github.com/windtf/wireproxy
+
+[Service]
+ExecStart=/usr/local/bin/wireproxy -c /etc/wireproxy/warp.conf
+RemainAfterExit=yes
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
