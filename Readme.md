@@ -1,7 +1,7 @@
 ## Command Installer
 
 ```bash
-apt update -y && apt install -y curl wget jq screen && screen -S nekotun -m bash -c "cd /root && wget -qO install https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install && chmod +x install && ./install"
+apt update -y && apt install -y curl wget jq && bash -c "cd /root && wget -qO install https://raw.githubusercontent.com/xenvoid404/autoscript-tunneling/master/install && chmod +x install && ./install"
 
 ```
 ## Informasi Service
